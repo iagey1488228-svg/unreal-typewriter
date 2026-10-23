@@ -1,0 +1,2639 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unreal Typewriter</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:#0a0a0e;color:#c8c8d0;user-select:none;-webkit-user-select:none;font-size:12px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:#0a0a0e}
+::-webkit-scrollbar-thumb{background:#2a2a32;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#3a3a44}
+#app{display:grid;grid-template-rows:34px 1fr 26px;grid-template-columns:240px 1fr 320px;grid-template-areas:"tb tb tb" "left center right" "status status status";width:100vw;height:100vh}
+#toolbar{grid-area:tb;background:#16161c;border-bottom:1px solid #2a2a32;display:flex;align-items:center;padding:0 8px;gap:2px;z-index:100}
+#left{grid-area:left;background:#131318;border-right:1px solid #2a2a32;display:flex;flex-direction:column;overflow:hidden}
+#center{grid-area:center;background:#0a0a0e;display:flex;flex-direction:column;overflow:hidden;position:relative}
+#right{grid-area:right;background:#131318;border-left:1px solid #2a2a32;display:flex;flex-direction:column;overflow:hidden}
+#status{grid-area:status;background:#16161c;border-top:1px solid #2a2a32;display:flex;align-items:center;padding:0 12px;gap:14px;font-size:11px;color:#6a6a7a}
+.tb-group{display:flex;gap:2px;align-items:center;padding:0 6px;border-right:1px solid #2a2a32;height:100%}
+.tb-group:last-child{border-right:none}
+.tb-logo{font-weight:700;font-size:13px;letter-spacing:0.5px;background:linear-gradient(90deg,#5b8def,#9b6bff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-right:4px}
+.tb-btn{background:transparent;border:1px solid transparent;padding:3px 9px;border-radius:4px;cursor:pointer;color:#b0b0c0;font-size:12px;display:flex;align-items:center;gap:5px;white-space:nowrap;transition:all .12s}
+.tb-btn:hover{background:#22222c;border-color:#333340;color:#e8e8f0}
+.tb-btn.active{background:#2a3a5a;border-color:#4a6a9a;color:#a8c8ff}
+.tb-btn.primary{background:#2a4a7a;border-color:#3a6aaa;color:#fff}
+.tb-btn.primary:hover{background:#345a8a}
+.tb-btn .icon{font-size:13px}
+.panel{display:flex;flex-direction:column;border-bottom:1px solid #22222a;flex-shrink:0}
+.panel.grow{flex:1;min-height:0}
+.panel-header{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:#18181f;border-bottom:1px solid #22222a;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;font-weight:600;color:#8a8a9a;flex-shrink:0}
+.panel-header .badge{font-size:10px;background:#2a2a36;padding:1px 6px;border-radius:8px;color:#6a6a7a}
+.panel-body{flex:1;overflow-y:auto;min-height:0}
+.tree-item{display:flex;align-items:center;padding:3px 8px 3px 12px;cursor:pointer;font-size:12px;color:#a8a8b8;border-left:2px solid transparent;white-space:nowrap}
+.tree-item:hover{background:#1a1a22}
+.tree-item.selected{background:#1e2e4a;border-left-color:#4a7acc;color:#e0e8f8}
+.tree-item .eye{width:16px;text-align:center;font-size:10px;color:#5a5a6a;cursor:pointer}
+.tree-item .eye:hover{color:#a8a8b8}
+.tree-item .label{flex:1;overflow:hidden;text-overflow:ellipsis;padding-left:4px}
+.tree-item .type-badge{font-size:9px;color:#4a4a5a;text-transform:uppercase}
+.cb-toolbar{display:flex;gap:4px;padding:5px;border-bottom:1px solid #22222a;flex-shrink:0}
+.cb-path{flex:1;background:#0a0a0e;border:1px solid #2a2a32;border-radius:3px;padding:2px 6px;font-size:11px;color:#6a6a7a}
+.cb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:4px;padding:6px}
+.cb-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 2px;border-radius:4px;cursor:pointer;border:1px solid transparent}
+.cb-item:hover{background:#1a1a22;border-color:#2a2a36}
+.cb-item .thumb{width:38px;height:38px;border-radius:4px;background:#1a1a22;display:flex;align-items:center;justify-content:center;font-size:18px}
+.cb-item .name{font-size:9px;color:#8a8a9a;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
+#viewport-wrap{flex:1;position:relative;overflow:hidden}
+#viewport{display:block;width:100%;height:100%;cursor:grab}
+#viewport.play-mode{cursor:none}
+.vp-tabs{position:absolute;top:6px;left:6px;display:flex;gap:2px;z-index:10}
+.vp-tab{background:rgba(20,20,26,0.85);backdrop-filter:blur(4px);border:1px solid #2a2a32;padding:2px 9px;border-radius:3px;font-size:10px;color:#8a8a9a;cursor:pointer}
+.vp-tab.active{background:#2a3a5a;color:#c8d8f8;border-color:#4a6a9a}
+.vp-stats{position:absolute;top:8px;right:8px;background:rgba(20,20,26,0.8);backdrop-filter:blur(4px);padding:3px 9px;border-radius:3px;font-size:10px;color:#6a6a7a;font-family:monospace;z-index:10;pointer-events:none}
+.vp-crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:14px;height:14px;pointer-events:none;z-index:10;display:none}
+.vp-crosshair::before,.vp-crosshair::after{content:'';position:absolute;background:#fff}
+.vp-crosshair::before{left:6px;top:0;width:2px;height:14px}
+.vp-crosshair::after{top:6px;left:0;width:14px;height:2px}
+.play-active .vp-crosshair{display:block}
+.play-active .vp-tabs{display:none}
+.vp-hud{position:absolute;top:12px;left:12px;background:rgba(20,20,26,0.85);backdrop-filter:blur(6px);border:1px solid #2a2a32;border-radius:6px;padding:8px 14px;z-index:11;font-family:monospace;font-size:12px;color:#e8e8f0;display:none}
+.play-active .vp-hud{display:block}
+.vp-hud .score{color:#5ac86a;font-weight:700}
+.vp-hud .hp{color:#e86a6a}
+.insp-tabs{display:flex;border-bottom:1px solid #22222a;padding:0 6px;flex-shrink:0}
+.insp-tab{padding:5px 10px;font-size:11px;color:#6a6a7a;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.insp-tab.active{color:#c8d8f8;border-bottom-color:#4a7acc}
+.insp-tab-content{padding:6px}
+.insp-section{margin-bottom:10px}
+.insp-section-title{font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#6a6a7a;padding:3px 6px;background:#18181f;border-radius:3px;margin-bottom:4px;font-weight:600}
+.insp-row{display:flex;align-items:center;gap:6px;padding:2px 0}
+.insp-row label{min-width:60px;font-size:11px;color:#8a8a9a;flex-shrink:0}
+.insp-input{flex:1;background:#0a0a0e;border:1px solid #2a2a32;border-radius:3px;padding:2px 6px;font-size:11px;color:#c8c8d0;outline:none;min-width:0}
+.insp-input:focus{border-color:#4a6a9a}
+.insp-input.num{text-align:right;font-variant-numeric:tabular-nums;font-family:monospace}
+.insp-vec{display:flex;gap:3px;flex:1;min-width:0}
+.insp-vec .insp-input{width:100%}
+.insp-color{width:100%;height:22px;border:1px solid #2a2a32;border-radius:3px;background:#0a0a0e;cursor:pointer;padding:1px}
+.insp-empty{text-align:center;color:#4a4a5a;padding:40px 20px;font-size:12px}
+.log-panel{display:flex;flex-direction:column;height:130px;border-top:1px solid #2a2a32;flex-shrink:0}
+.log-header{display:flex;align-items:center;padding:3px 8px;background:#18181f;border-bottom:1px solid #22222a;gap:6px;flex-shrink:0}
+.log-header .title{font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#8a8a9a;font-weight:600}
+.log-header .spacer{flex:1}
+.log-header .filter{font-size:10px;color:#5a5a6a;cursor:pointer;padding:1px 6px;border-radius:3px}
+.log-header .filter.active{color:#8ac86a;background:#1a2a1a}
+.log-body{flex:1;overflow-y:auto;padding:3px 8px;font-family:'Consolas',monospace;font-size:11px;line-height:1.45}
+.log-line{padding:1px 0;color:#8a8a9a;white-space:pre-wrap;word-break:break-word}
+.log-line.warn{color:#e8c86a}
+.log-line.error{color:#e86a6a}
+.log-line.info{color:#8ac8e8}
+.log-line .time{color:#4a4a5a;margin-right:6px}
+.log-input-row{display:flex;gap:4px;padding:3px 8px;border-top:1px solid #22222a;flex-shrink:0}
+.log-input-row .prompt{color:#4a7acc;font-family:monospace;padding:2px 0}
+.log-input{flex:1;background:#0a0a0e;border:1px solid #2a2a32;border-radius:3px;padding:2px 6px;font-family:monospace;font-size:11px;color:#c8c8d0;outline:none}
+.status-item{display:flex;align-items:center;gap:4px}
+.status-item .dot{width:6px;height:6px;border-radius:50%;background:#5ac86a}
+.status-sep{width:1px;height:14px;background:#2a2a32}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);z-index:1000;display:none;align-items:center;justify-content:center}
+.modal-backdrop.on{display:flex}
+.modal{background:#16161c;border:1px solid #2a2a32;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,0.6);min-width:400px;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.modal.full{width:95vw;height:90vh;max-width:none}
+.modal-header{padding:12px 16px;border-bottom:1px solid #2a2a32;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-header h2{font-size:14px;font-weight:600;color:#e8e8f0}
+.modal-close{background:transparent;border:none;color:#6a6a7a;font-size:20px;cursor:pointer;padding:0 4px;border-radius:3px}
+.modal-close:hover{color:#e86a6a;background:#2a1a1a}
+.modal-body{padding:16px;overflow-y:auto;flex:1;min-height:0}
+.modal-body.nopad{padding:0}
+.modal-footer{padding:10px 16px;border-top:1px solid #2a2a32;display:flex;justify-content:flex-end;gap:6px;flex-shrink:0}
+.modal-btn{background:#22222c;border:1px solid #333340;border-radius:4px;padding:5px 14px;color:#c8c8d0;cursor:pointer;font-size:12px}
+.modal-btn:hover{background:#2a2a36}
+.modal-btn.primary{background:#2a4a7a;border-color:#3a6aaa;color:#fff}
+.modal-btn.primary:hover{background:#345a8a}
+.dropdown{position:relative}
+.dropdown-menu{position:absolute;top:100%;left:0;background:#1a1a22;border:1px solid #333340;border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,0.5);padding:3px 0;z-index:500;min-width:200px;display:none;margin-top:2px}
+.dropdown.open .dropdown-menu{display:block}
+.dropdown-item{padding:5px 12px;font-size:12px;color:#b0b0c0;cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+.dropdown-item:hover{background:#2a3a5a;color:#e8e8f0}
+.dropdown-item .shortcut{font-size:10px;color:#5a5a6a}
+.dropdown-sep{height:1px;background:#2a2a32;margin:3px 0}
+#notifications{position:fixed;bottom:40px;right:16px;z-index:3000;display:flex;flex-direction:column;gap:6px;align-items:flex-end;pointer-events:none}
+.notif{background:rgba(22,22,28,0.95);backdrop-filter:blur(8px);border:1px solid #2a2a32;border-left:3px solid #4a7acc;padding:6px 12px;border-radius:4px;font-size:12px;color:#c8c8d0;box-shadow:0 8px 24px rgba(0,0,0,0.4);animation:notifIn .25s ease,notifOut .25s ease 2.75s forwards}
+.notif.success{border-left-color:#5ac86a}
+.notif.warn{border-left-color:#e8c86a}
+.notif.error{border-left-color:#e86a6a}
+@keyframes notifIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+@keyframes notifOut{to{opacity:0;transform:translateX(40px)}}
+#splash{position:fixed;inset:0;background:#0a0a0e;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s}
+#splash.fade{opacity:0;pointer-events:none}
+#splash .logo{font-size:32px;font-weight:700;letter-spacing:2px;background:linear-gradient(90deg,#5b8def,#9b6bff,#5b8def);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 3s linear infinite}
+@keyframes shimmer{to{background-position:200% 0}}
+#splash .sub{font-size:11px;color:#4a4a5a;margin-top:6px;letter-spacing:3px;text-transform:uppercase}
+#splash .by{font-size:10px;color:#6a6a8a;margin-top:14px;letter-spacing:2px}
+#splash .bar{width:240px;height:2px;background:#1a1a22;margin-top:20px;border-radius:1px;overflow:hidden}
+#splash .bar-fill{height:100%;width:0;background:linear-gradient(90deg,#5b8def,#9b6bff);transition:width .3s}
+#splash .status{font-size:10px;color:#4a4a5a;margin-top:8px;font-family:monospace}
+.credit-btn{background:linear-gradient(135deg,#5b8def,#9b6bff);border:none;padding:4px 12px;border-radius:12px;color:#fff;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.5px;transition:transform .12s;white-space:nowrap}
+.credit-btn:hover{transform:scale(1.05)}
+.editor3d-layout{display:grid;grid-template-columns:180px 1fr 240px;height:100%;background:#0a0a0e}
+.editor3d-layout > div{overflow-y:auto}
+.editor3d-left{border-right:1px solid #2a2a32;padding:10px;background:#131318}
+.editor3d-right{border-left:1px solid #2a2a32;padding:10px;background:#131318}
+.editor3d-center{position:relative;overflow:hidden;background:#0a0a0e}
+.editor3d-center canvas{display:block;width:100%;height:100%;cursor:grab}
+.prim-list{display:flex;flex-direction:column;gap:3px}
+.prim-btn{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#1a1a22;border:1px solid #2a2a32;border-radius:4px;color:#b0b0c0;cursor:pointer;font-size:12px;transition:all .12s;text-align:left}
+.prim-btn:hover{background:#22222c;border-color:#4a6a9a;color:#e8e8f0}
+.modal-textarea{width:100%;min-height:280px;background:#0a0a0e;border:1px solid #2a2a32;border-radius:4px;padding:8px;font-family:'Consolas',monospace;font-size:12px;color:#c8c8d0;outline:none;resize:vertical}
+.modal-textarea:focus{border-color:#4a6a9a}
+.script-toolbar{display:flex;gap:6px;padding:6px 10px;background:#18181f;border-bottom:1px solid #22222a;align-items:center;flex-shrink:0}
+.script-lang-select{background:#0a0a0e;border:1px solid #2a2a32;color:#c8c8d0;padding:3px 6px;border-radius:3px;font-size:11px;outline:none}
+.script-editor-area{flex:1;position:relative;min-height:0}
+.script-editor-area textarea{width:100%;height:100%;background:#0a0a0e;color:#c8c8d0;border:none;outline:none;resize:none;padding:10px 10px 10px 44px;font-family:'Consolas',monospace;font-size:12px;line-height:1.55;tab-size:2}
+.script-editor-area .line-numbers{position:absolute;left:0;top:0;bottom:0;width:36px;background:#0d0d12;color:#3a3a44;padding:10px 6px;font-family:monospace;font-size:12px;line-height:1.55;text-align:right;pointer-events:none;overflow:hidden}
+.script-status{padding:4px 10px;background:#18181f;border-top:1px solid #22222a;font-size:10px;color:#6a6a7a;display:flex;justify-content:space-between;flex-shrink:0}
+.script-status .ok{color:#5ac86a}
+.script-status .err{color:#e86a6a}
+.vec-row{display:flex;gap:3px;flex:1}
+.vec-row input{width:100%}
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <div class="logo">UNREAL TYPEWRITER</div>
+  <div class="sub">3D Game Engine</div>
+  <div class="by">by unreal</div>
+  <div class="bar"><div class="bar-fill" id="splash-bar"></div></div>
+  <div class="status" id="splash-status">инициализация...</div>
+</div>
+
+<div id="app">
+  <div id="toolbar">
+    <div class="tb-group"><span class="tb-logo">UT</span></div>
+    <div class="tb-group">
+      <div class="dropdown">
+        <button class="tb-btn" data-dropdown="file">Файл</button>
+        <div class="dropdown-menu" data-menu="file">
+          <div class="dropdown-item" data-action="new">Новый проект</div>
+          <div class="dropdown-item" data-action="save">Сохранить (локально)</div>
+          <div class="dropdown-item" data-action="load">Загрузить (локально)</div>
+          <div class="dropdown-sep"></div>
+          <div class="dropdown-item" data-action="export-project">📦 Экспорт проекта (.utproj)</div>
+          <div class="dropdown-item" data-action="import-project">📥 Импорт проекта (.utproj)</div>
+          <div class="dropdown-item" data-action="export-html">🌐 Экспорт в HTML</div>
+          <div class="dropdown-sep"></div>
+          <div class="dropdown-item" data-action="import-type">📥 Импорт .type ассета</div>
+        </div>
+      </div>
+      <div class="dropdown">
+        <button class="tb-btn" data-dropdown="create">Создать</button>
+        <div class="dropdown-menu" data-menu="create">
+          <div class="dropdown-item" data-create="cube">Куб</div>
+          <div class="dropdown-item" data-create="sphere">Сфера</div>
+          <div class="dropdown-item" data-create="cylinder">Цилиндр</div>
+          <div class="dropdown-item" data-create="cone">Конус</div>
+          <div class="dropdown-item" data-create="torus">Тор</div>
+          <div class="dropdown-item" data-create="plane">Плоскость</div>
+          <div class="dropdown-sep"></div>
+          <div class="dropdown-item" data-create="light">Свет</div>
+          <div class="dropdown-item" data-create="camera">Камера</div>
+        </div>
+      </div>
+      <div class="dropdown">
+        <button class="tb-btn" data-dropdown="templates">Шаблоны</button>
+        <div class="dropdown-menu" data-menu="templates">
+          <div class="dropdown-item" data-template="zombie">🎮 Zombie Shooter (3D)</div>
+          <div class="dropdown-item" data-template="empty">Пустая сцена</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tb-group">
+      <button class="tb-btn primary" id="btn-play" title="Play (F5)"><span class="icon">▶</span> Play</button>
+      <button class="tb-btn" id="btn-stop" title="Stop (Esc)"><span class="icon">■</span> Stop</button>
+    </div>
+
+    <div class="tb-group">
+      <button class="tb-btn" id="btn-modeler" title="3D-моделлер">🧊 Моделлер</button>
+    </div>
+
+    <div class="tb-group" style="margin-left:auto;">
+      <button class="tb-btn" id="btn-help">?</button>
+      <button class="credit-btn" id="btn-credit">by unreal</button>
+    </div>
+  </div>
+
+  <div id="left">
+    <div class="panel grow">
+      <div class="panel-header"><span>World Outliner</span><span class="badge" id="outliner-count">0</span></div>
+      <div class="panel-body"><div id="outliner" style="padding:4px 0;"></div></div>
+    </div>
+    <div class="panel grow">
+      <div class="panel-header"><span>Content Browser</span><span class="badge" id="cb-count">0</span></div>
+      <div class="cb-toolbar">
+        <div class="cb-path">/Game/</div>
+        <button class="tb-btn" id="cb-import" style="padding:1px 6px;" title="Импорт .type">📥</button>
+        <button class="tb-btn" id="cb-new" style="padding:1px 6px;" title="Новый .type">+</button>
+      </div>
+      <div class="panel-body"><div class="cb-grid" id="cb-grid"></div></div>
+    </div>
+  </div>
+
+  <div id="center">
+    <div id="viewport-wrap">
+      <canvas id="viewport"></canvas>
+      <div class="vp-tabs">
+        <div class="vp-tab active">Perspective</div>
+        <div class="vp-tab" style="opacity:.5;cursor:not-allowed;">Top</div>
+      </div>
+      <div class="vp-stats" id="vp-stats">0 objs · 60 fps</div>
+      <div class="vp-crosshair"></div>
+      <div class="vp-hud" id="vp-hud"></div>
+    </div>
+    <div class="log-panel">
+      <div class="log-header">
+        <span class="title">Output Log</span>
+        <span class="spacer"></span>
+        <span class="filter active" data-log-filter="all">All</span>
+        <span class="filter" data-log-filter="info">Info</span>
+        <span class="filter" data-log-filter="warn">Warn</span>
+        <span class="filter" data-log-filter="error">Error</span>
+        <button class="tb-btn" id="log-clear" style="padding:0 6px;font-size:10px;">Clear</button>
+      </div>
+      <div class="log-body" id="log-body"></div>
+      <div class="log-input-row">
+        <span class="prompt">&gt;</span>
+        <input class="log-input" id="log-input" placeholder="команда (help)">
+      </div>
+    </div>
+  </div>
+
+  <div id="right">
+    <div class="panel grow">
+      <div class="panel-header"><span>Details</span><span class="badge" id="details-badge">—</span></div>
+      <div class="panel-body">
+        <div class="insp-tabs">
+          <div class="insp-tab active" data-insp="transform">Transform</div>
+          <div class="insp-tab" data-insp="render">Render</div>
+          <div class="insp-tab" data-insp="script">Script</div>
+        </div>
+        <div class="insp-tab-content" id="inspector-content">
+          <div class="insp-empty">Ничего не выбрано</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="status">
+    <div class="status-item"><span class="dot"></span><span id="status-state">Ready</span></div>
+    <div class="status-sep"></div>
+    <div class="status-item">Объектов: <span id="status-obj-count">0</span></div>
+    <div class="status-sep"></div>
+    <div class="status-item">Выбрано: <span id="status-sel">—</span></div>
+    <div style="margin-left:auto;" class="status-item" id="status-fps">60 fps</div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <h2 id="modal-title">Заголовок</h2>
+      <button class="modal-close" id="modal-close">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<div id="notifications"></div>
+
+<script>
+/* ============================================================
+   UTILS
+   ============================================================ */
+const U = {
+  uid: () => Math.random().toString(36).slice(2, 10),
+  clamp: (v, a, b) => Math.max(a, Math.min(b, v)),
+  rand: (a, b) => a + Math.random() * (b - a),
+  dist: (x1,y1,z1,x2,y2,z2) => Math.hypot(x2-x1, y2-y1, z2-z1),
+  esc: (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+  pad2: (n) => String(n).padStart(2, '0'),
+  timeStr: () => { const d = new Date(); return `${U.pad2(d.getHours())}:${U.pad2(d.getMinutes())}:${U.pad2(d.getSeconds())}`; },
+  deepClone: (o) => JSON.parse(JSON.stringify(o)),
+};
+
+/* ============================================================
+   MAT4 / VEC3
+   ============================================================ */
+const M4 = {
+  identity: () => new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]),
+  multiply(a, b) {
+    const o = new Float32Array(16);
+    for (let i = 0; i < 4; i++)
+      for (let j = 0; j < 4; j++)
+        o[j*4+i] = a[0*4+i]*b[j*4+0]+a[1*4+i]*b[j*4+1]+a[2*4+i]*b[j*4+2]+a[3*4+i]*b[j*4+3];
+    return o;
+  },
+  perspective(fovy, aspect, near, far) {
+    const f = 1 / Math.tan(fovy/2), nf = 1 / (near-far);
+    return new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0]);
+  },
+  lookAt(eye, center, up) {
+    const zx = eye[0]-center[0], zy = eye[1]-center[1], zz = eye[2]-center[2];
+    let zl = Math.hypot(zx,zy,zz)||1;
+    const Zx=zx/zl, Zy=zy/zl, Zz=zz/zl;
+    const xx = up[1]*Zz-up[2]*Zy, xy = up[2]*Zx-up[0]*Zz, xz = up[0]*Zy-up[1]*Zx;
+    let xl = Math.hypot(xx,xy,xz)||1;
+    const Xx=xx/xl, Xy=xy/xl, Xz=xz/xl;
+    const Yx=Zy*Xz-Zz*Xy, Yy=Zz*Xx-Zx*Xz, Yz=Zx*Xy-Zy*Xx;
+    return new Float32Array([
+      Xx, Yx, Zx, 0, Xy, Yy, Zy, 0, Xz, Yz, Zz, 0,
+      -(Xx*eye[0]+Xy*eye[1]+Xz*eye[2]),
+      -(Yx*eye[0]+Yy*eye[1]+Yz*eye[2]),
+      -(Zx*eye[0]+Zy*eye[1]+Zz*eye[2]), 1
+    ]);
+  },
+  translation(x,y,z){const m=M4.identity();m[12]=x;m[13]=y;m[14]=z;return m},
+  rotationX(a){const c=Math.cos(a),s=Math.sin(a),m=M4.identity();m[5]=c;m[6]=s;m[9]=-s;m[10]=c;return m},
+  rotationY(a){const c=Math.cos(a),s=Math.sin(a),m=M4.identity();m[0]=c;m[2]=-s;m[8]=s;m[10]=c;return m},
+  rotationZ(a){const c=Math.cos(a),s=Math.sin(a),m=M4.identity();m[0]=c;m[1]=s;m[4]=-s;m[5]=c;return m},
+  scale(x,y,z){const m=M4.identity();m[0]=x;m[5]=y;m[10]=z;return m},
+  compose(tx,ty,tz,rx,ry,rz,sx,sy,sz){
+    let m = M4.translation(tx,ty,tz);
+    m = M4.multiply(m, M4.rotationZ(rz));
+    m = M4.multiply(m, M4.rotationY(ry));
+    m = M4.multiply(m, M4.rotationX(rx));
+    m = M4.multiply(m, M4.scale(sx,sy,sz));
+    return m;
+  },
+  invert(m){
+    const o = new Float32Array(16);
+    const a00=m[0],a01=m[1],a02=m[2],a03=m[3],a10=m[4],a11=m[5],a12=m[6],a13=m[7],
+          a20=m[8],a21=m[9],a22=m[10],a23=m[11],a30=m[12],a31=m[13],a32=m[14],a33=m[15];
+    const b00=a00*a11-a01*a10,b01=a00*a12-a02*a10,b02=a00*a13-a03*a10,b03=a01*a12-a02*a11,
+          b04=a01*a13-a03*a11,b05=a02*a13-a03*a12,b06=a20*a31-a21*a30,b07=a20*a32-a22*a30,
+          b08=a20*a33-a23*a30,b09=a21*a32-a22*a31,b10=a21*a33-a23*a31,b11=a22*a33-a23*a32;
+    let det = b00*b11-b01*b10+b02*b09+b03*b08-b04*b07+b05*b06;
+    if (!det) return M4.identity();
+    det = 1/det;
+    o[0]=(a11*b11-a12*b10+a13*b09)*det; o[1]=(a02*b10-a01*b11-a03*b09)*det;
+    o[2]=(a31*b05-a32*b04+a33*b03)*det; o[3]=(a22*b04-a21*b05-a23*b03)*det;
+    o[4]=(a12*b08-a10*b11-a13*b07)*det; o[5]=(a00*b11-a02*b08+a03*b07)*det;
+    o[6]=(a32*b02-a30*b05-a33*b01)*det; o[7]=(a20*b05-a22*b02+a23*b01)*det;
+    o[8]=(a10*b10-a11*b08+a13*b06)*det; o[9]=(a01*b08-a00*b10-a03*b06)*det;
+    o[10]=(a30*b04-a31*b02+a33*b00)*det; o[11]=(a21*b02-a20*b04-a23*b00)*det;
+    o[12]=(a11*b07-a10*b09-a12*b06)*det; o[13]=(a00*b09-a01*b07+a02*b06)*det;
+    o[14]=(a31*b01-a30*b03-a32*b00)*det; o[15]=(a20*b03-a21*b01+a22*b00)*det;
+    return o;
+  },
+};
+
+const V3 = {
+  norm: a => { const l = Math.hypot(a[0],a[1],a[2])||1; return [a[0]/l,a[1]/l,a[2]/l]; },
+  dot: (a,b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2],
+};
+
+function mulMV(m,v){return[
+  m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3],
+  m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3],
+  m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3],
+  m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3],
+]}
+
+/* ============================================================
+   PRIMITIVES
+   ============================================================ */
+const Primitives = {
+  cube(size=1){
+    const s=size/2, positions=[], normals=[], indices=[];
+    const faces=[
+      {n:[0,0,1],v:[[-s,-s,s],[s,-s,s],[s,s,s],[-s,s,s]]},
+      {n:[0,0,-1],v:[[s,-s,-s],[-s,-s,-s],[-s,s,-s],[s,s,-s]]},
+      {n:[1,0,0],v:[[s,-s,s],[s,-s,-s],[s,s,-s],[s,s,s]]},
+      {n:[-1,0,0],v:[[-s,-s,-s],[-s,-s,s],[-s,s,s],[-s,s,-s]]},
+      {n:[0,1,0],v:[[-s,s,s],[s,s,s],[s,s,-s],[-s,s,-s]]},
+      {n:[0,-1,0],v:[[-s,-s,-s],[s,-s,-s],[s,-s,s],[-s,-s,s]]},
+    ];
+    let base=0;
+    for(const f of faces){
+      for(const v of f.v){positions.push(...v);normals.push(...f.n);}
+      indices.push(base,base+1,base+2,base,base+2,base+3);base+=4;
+    }
+    return {positions,normals,indices};
+  },
+  sphere(radius=0.5,segs=20,rings=12){
+    const positions=[],normals=[],indices=[];
+    for(let y=0;y<=rings;y++){
+      const v=y/rings,phi=v*Math.PI;
+      for(let x=0;x<=segs;x++){
+        const u=x/segs,theta=u*Math.PI*2;
+        const px=-Math.cos(theta)*Math.sin(phi),py=Math.cos(phi),pz=Math.sin(theta)*Math.sin(phi);
+        positions.push(px*radius,py*radius,pz*radius);normals.push(px,py,pz);
+      }
+    }
+    for(let y=0;y<rings;y++)for(let x=0;x<segs;x++){
+      const a=y*(segs+1)+x,b=a+segs+1;
+      indices.push(a,b,a+1,b,b+1,a+1);
+    }
+    return {positions,normals,indices};
+  },
+  cylinder(radius=0.5,height=1,segs=20){
+    const positions=[],normals=[],indices=[];const h=height/2;
+    for(let i=0;i<=segs;i++){
+      const a=(i/segs)*Math.PI*2,cx=Math.cos(a),sz=Math.sin(a);
+      positions.push(cx*radius,-h,sz*radius);normals.push(cx,0,sz);
+      positions.push(cx*radius,h,sz*radius);normals.push(cx,0,sz);
+    }
+    for(let i=0;i<segs;i++){const a=i*2;indices.push(a,a+2,a+1,a+1,a+2,a+3);}
+    const topBase=positions.length/3;
+    positions.push(0,h,0);normals.push(0,1,0);
+    for(let i=0;i<=segs;i++){const a=(i/segs)*Math.PI*2;positions.push(Math.cos(a)*radius,h,Math.sin(a)*radius);normals.push(0,1,0);}
+    for(let i=0;i<segs;i++)indices.push(topBase,topBase+i+1,topBase+i+2);
+    const botBase=positions.length/3;
+    positions.push(0,-h,0);normals.push(0,-1,0);
+    for(let i=0;i<=segs;i++){const a=(i/segs)*Math.PI*2;positions.push(Math.cos(a)*radius,-h,Math.sin(a)*radius);normals.push(0,-1,0);}
+    for(let i=0;i<segs;i++)indices.push(botBase,botBase+i+2,botBase+i+1);
+    return {positions,normals,indices};
+  },
+  cone(radius=0.5,height=1,segs=20){
+    const positions=[],normals=[],indices=[];const h=height/2;
+    for(let i=0;i<segs;i++){
+      const a1=(i/segs)*Math.PI*2,a2=((i+1)/segs)*Math.PI*2;
+      const p1=[Math.cos(a1)*radius,-h,Math.sin(a1)*radius];
+      const p2=[Math.cos(a2)*radius,-h,Math.sin(a2)*radius];
+      const n1=V3.norm([Math.cos(a1)*height,radius,Math.sin(a1)*height]);
+      const n2=V3.norm([Math.cos(a2)*height,radius,Math.sin(a2)*height]);
+      positions.push(...p1,0,h,0,...p2);
+      normals.push(...n1,...V3.norm([(n1[0]+n2[0])/2,(n1[1]+n2[1])/2,(n1[2]+n2[2])/2]),...n2);
+      const b=i*3;indices.push(b,b+1,b+2);
+    }
+    const base=positions.length/3;
+    positions.push(0,-h,0);normals.push(0,-1,0);
+    for(let i=0;i<=segs;i++){const a=(i/segs)*Math.PI*2;positions.push(Math.cos(a)*radius,-h,Math.sin(a)*radius);normals.push(0,-1,0);}
+    for(let i=0;i<segs;i++)indices.push(base,base+i+2,base+i+1);
+    return {positions,normals,indices};
+  },
+  torus(R=0.5,r=0.2,segs=24,sides=12){
+    const positions=[],normals=[],indices=[];
+    for(let i=0;i<=segs;i++){
+      const u=(i/segs)*Math.PI*2;
+      for(let j=0;j<=sides;j++){
+        const v=(j/sides)*Math.PI*2;
+        const cx=Math.cos(u)*(R+r*Math.cos(v));
+        const cy=Math.sin(v)*r;
+        const cz=Math.sin(u)*(R+r*Math.cos(v));
+        positions.push(cx,cy,cz);
+        normals.push(Math.cos(u)*Math.cos(v),Math.sin(v),Math.sin(u)*Math.cos(v));
+      }
+    }
+    for(let i=0;i<segs;i++)for(let j=0;j<sides;j++){
+      const a=i*(sides+1)+j,b=a+sides+1;
+      indices.push(a,b,a+1,b,b+1,a+1);
+    }
+    return {positions,normals,indices};
+  },
+  plane(size=1){
+    const s=size/2;
+    return {
+      positions:[-s,0,-s, s,0,-s, s,0,s, -s,0,s],
+      normals:[0,1,0, 0,1,0, 0,1,0, 0,1,0],
+      indices:[0,2,1, 0,3,2],
+    };
+  },
+};
+
+function boundingRadius(geom){
+  let maxR=0;const p=geom.positions;
+  for(let i=0;i<p.length;i+=3){
+    const d=Math.hypot(p[i],p[i+1],p[i+2]);
+    if(d>maxR)maxR=d;
+  }
+  return maxR;
+}
+
+/* ============================================================
+   LOGGER
+   ============================================================ */
+const Logger = {
+  lines:[], filter:'all', body:null,
+  init(){
+    this.body=document.getElementById('log-body');
+    document.querySelectorAll('.log-header .filter').forEach(f=>{
+      f.addEventListener('click',()=>{
+        document.querySelectorAll('.log-header .filter').forEach(x=>x.classList.remove('active'));
+        f.classList.add('active');this.filter=f.dataset.logFilter;this.render();
+      });
+    });
+    document.getElementById('log-clear').addEventListener('click',()=>{this.lines=[];this.render();});
+    document.getElementById('log-input').addEventListener('keydown',e=>{
+      if(e.key==='Enter'){const c=e.target.value.trim();if(c){this.log('> '+c,'info');Console.exec(c);}e.target.value='';}
+    });
+  },
+  log(text,level=''){
+    this.lines.push({time:U.timeStr(),text,level});
+    if(this.lines.length>400)this.lines.shift();
+    this.render();
+  },
+  info(t){this.log(t,'info');},warn(t){this.log(t,'warn');},error(t){this.log(t,'error');},
+  render(){
+    if(!this.body)return;
+    let html='';
+    for(const l of this.lines){
+      if(this.filter!=='all'&&l.level!==this.filter)continue;
+      html+=`<div class="log-line ${l.level}"><span class="time">${l.time}</span>${U.esc(l.text)}</div>`;
+    }
+    this.body.innerHTML=html;this.body.scrollTop=this.body.scrollHeight;
+  },
+};
+
+/* ============================================================
+   CONSOLE
+   ============================================================ */
+const Console = {
+  commands:{
+    help(){Logger.info('help, list, select <name>, add <type>, clear, save, load, export, play, stop');},
+    list(){Logger.info('Объекты:');Editor.scene.objects.forEach(o=>Logger.info(`  [${o.id}] ${o.name} (${o.type})`));},
+    select(args){
+      const o=Editor.scene.objects.find(x=>x.id===args[0]||x.name===args[0]);
+      if(o){Editor.select(o);Logger.info('Выбран: '+o.name);}else Logger.warn('Не найден');
+    },
+    add(args){const o=Editor.createObject(args[0]||'cube');Logger.info('Создан: '+o.name);},
+    clear(){Editor.scene.objects=[];Editor.selected=null;Editor.refreshAll();Logger.info('Очищено');},
+    save(){Editor.saveLocal();Logger.info('Сохранено');},
+    load(){Editor.loadLocal();Logger.info('Загружено');},
+    export(){Exporter.exportProject();},
+    play(){Editor.setPlayMode(true);},
+    stop(){Editor.setPlayMode(false);},
+  },
+  exec(line){
+    const p=line.split(/\s+/),c=p[0].toLowerCase(),a=p.slice(1);
+    if(this.commands[c])this.commands[c](a);else Logger.warn('Неизвестно: '+c);
+  },
+};
+
+/* ============================================================
+   SCRIPT TOKENIZER
+   ============================================================ */
+const Tokenizer = {
+  KEYWORDS: new Set(['if','else','while','for','function','return','let','const','var','true','false','null','break','continue','in','of','and','or','not','elif','def','class','print','int','float','bool','void','auto','new','delete','struct','end','do','then']),
+  PUNCT: [['==','EQ'],['!=','NEQ'],['<=','LTE'],['>=','GTE'],['&&','AND'],['||','OR'],['++','INC'],['--','DEC'],['+=','PLUSEQ'],['-=','MINUSEQ'],['*=','MULEQ'],['/=','DIVEQ'],['->','ARROW'],['::','SCOPE'],
+    ['+','PLUS'],['-','MINUS'],['*','STAR'],['/','SLASH'],['%','PERCENT'],['=','ASSIGN'],['<','LT'],['>','GT'],['!','NOT'],['(','LPAREN'],[')','RPAREN'],['{','LBRACE'],['}','RBRACE'],['[','LBRACKET'],[']','RBRACKET'],[';','SEMI'],[':','COLON'],['.','DOT'],[',','COMMA']],
+  tokenize(src){
+    const t=[];let i=0;const N=src.length;
+    while(i<N){
+      const c=src[i];
+      if(c===' '||c==='\t'||c==='\n'||c==='\r'){i++;continue;}
+      if(c==='/'&&src[i+1]==='/'){while(i<N&&src[i]!=='\n')i++;continue;}
+      if(c==='#'){while(i<N&&src[i]!=='\n')i++;continue;}
+      if(c==='/'&&src[i+1]==='*'){i+=2;while(i<N&&!(src[i]==='*'&&src[i+1]==='/'))i++;i+=2;continue;}
+      if(c==='"'||c==="'"){
+        const q=c;i++;let str='';
+        while(i<N&&src[i]!==q){
+          if(src[i]==='\\'){i++;const e=src[i];str+=e==='n'?'\n':e==='t'?'\t':e==='\\'?'\\':e;i++;}
+          else str+=src[i++];
+        }
+        i++;t.push({type:'STRING',value:str});continue;
+      }
+      if(/[0-9]/.test(c)||(c==='.'&&/[0-9]/.test(src[i+1]))){
+        let n='';while(i<N&&/[0-9.]/.test(src[i]))n+=src[i++];
+        t.push({type:'NUMBER',value:parseFloat(n)});continue;
+      }
+      if(/[a-zA-Z_]/.test(c)){
+        let id='';while(i<N&&/[a-zA-Z0-9_]/.test(src[i]))id+=src[i++];
+        t.push({type:this.KEYWORDS.has(id)?'KEYWORD':'IDENT',value:id});continue;
+      }
+      let m=false;
+      for(const [p,tp] of this.PUNCT){
+        if(src.substr(i,p.length)===p){t.push({type:tp,value:p});i+=p.length;m=true;break;}
+      }
+      if(!m)throw new Error(`Символ "${c}" (${i})`);
+    }
+    t.push({type:'EOF',value:null});
+    return t;
+  },
+};
+
+/* ============================================================
+   SCRIPT PARSER
+   ============================================================ */
+class Parser {
+  constructor(tokens){this.tokens=tokens;this.pos=0;}
+  peek(o=0){return this.tokens[this.pos+o]||{type:'EOF'};}
+  next(){return this.tokens[this.pos++];}
+  expect(type){const t=this.next();if(t.type!==type)throw new Error(`Ожидался ${type}, получен ${t.type}`);return t;}
+  match(type){if(this.peek().type===type)return this.next();return null;}
+  parseProgram(){const body=[];while(this.peek().type!=='EOF')body.push(this.parseStatement());return{type:'Program',body};}
+  parseStatement(){
+    const t=this.peek();
+    if(t.type==='KEYWORD'){
+      switch(t.value){
+        case 'let':case 'const':case 'var':return this.parseVarDecl();
+        case 'function':return this.parseFuncDecl();
+        case 'if':return this.parseIf();
+        case 'while':return this.parseWhile();
+        case 'for':return this.parseFor();
+        case 'return':return this.parseReturn();
+        case 'break':this.next();this.match('SEMI');return{type:'Break'};
+        case 'continue':this.next();this.match('SEMI');return{type:'Continue'};
+      }
+    }
+    const expr=this.parseExpr();this.match('SEMI');
+    return{type:'ExprStatement',expr};
+  }
+  parseVarDecl(){
+    this.next();const name=this.expect('IDENT').value;
+    let init=null;if(this.match('ASSIGN'))init=this.parseExpr();
+    this.match('SEMI');return{type:'VarDecl',name,init};
+  }
+  parseFuncDecl(){
+    this.next();const name=this.expect('IDENT').value;
+    this.expect('LPAREN');const params=[];
+    while(this.peek().type!=='RPAREN'){params.push(this.expect('IDENT').value);if(!this.match('COMMA'))break;}
+    this.expect('RPAREN');
+    const body=this.parseBlock();
+    return{type:'FuncDecl',name,params,body};
+  }
+  parseBlock(){
+    this.expect('LBRACE');const body=[];
+    while(this.peek().type!=='RBRACE'&&this.peek().type!=='EOF')body.push(this.parseStatement());
+    this.expect('RBRACE');return{type:'Block',body};
+  }
+  parseIf(){
+    this.next();const cond=this.parseExpr();
+    const cons=this.parseBlock();
+    let alt=null;
+    if(this.peek().type==='KEYWORD'&&(this.peek().value==='else'||this.peek().value==='elif')){
+      this.next();
+      if(this.peek().type==='KEYWORD'&&this.peek().value==='if')alt=this.parseIf();
+      else alt=this.parseBlock();
+    }
+    return{type:'If',cond,cons,alt};
+  }
+  parseWhile(){
+    this.next();const cond=this.parseExpr();const body=this.parseBlock();
+    return{type:'While',cond,body};
+  }
+  parseFor(){
+    this.next();const v=this.expect('IDENT').value;
+    if(this.peek().type==='KEYWORD'&&this.peek().value==='in'){
+      this.next();const iter=this.parseExpr();const body=this.parseBlock();
+      return{type:'ForIn',varName:v,iter,body};
+    }
+    throw new Error('for-in expected');
+  }
+  parseReturn(){
+    this.next();let arg=null;
+    if(this.peek().type!=='SEMI'&&this.peek().type!=='RBRACE')arg=this.parseExpr();
+    this.match('SEMI');return{type:'Return',arg};
+  }
+  parseExpr(){return this.parseAssignment();}
+  parseAssignment(){
+    const left=this.parseOr();
+    if(this.match('ASSIGN')){const right=this.parseAssignment();return{type:'Assign',target:left,value:right};}
+    return left;
+  }
+  parseOr(){
+    let left=this.parseAnd();
+    while(this.peek().type==='OR'||(this.peek().type==='KEYWORD'&&this.peek().value==='or')){
+      this.next();const right=this.parseAnd();left={type:'Binary',op:'||',left,right};
+    }
+    return left;
+  }
+  parseAnd(){
+    let left=this.parseEquality();
+    while(this.peek().type==='AND'||(this.peek().type==='KEYWORD'&&this.peek().value==='and')){
+      this.next();const right=this.parseEquality();left={type:'Binary',op:'&&',left,right};
+    }
+    return left;
+  }
+  parseEquality(){
+    let left=this.parseComparison();
+    while(this.peek().type==='EQ'||this.peek().type==='NEQ'){
+      const op=this.next().value;const right=this.parseComparison();left={type:'Binary',op,left,right};
+    }
+    return left;
+  }
+  parseComparison(){
+    let left=this.parseAdd();
+    while(['LT','GT','LTE','GTE'].includes(this.peek().type)){
+      const op=this.next().value;const right=this.parseAdd();left={type:'Binary',op,left,right};
+    }
+    return left;
+  }
+  parseAdd(){
+    let left=this.parseMul();
+    while(this.peek().type==='PLUS'||this.peek().type==='MINUS'){
+      const op=this.next().value;const right=this.parseMul();left={type:'Binary',op,left,right};
+    }
+    return left;
+  }
+  parseMul(){
+    let left=this.parseUnary();
+    while(this.peek().type==='STAR'||this.peek().type==='SLASH'||this.peek().type==='PERCENT'){
+      const op=this.next().value;const right=this.parseUnary();left={type:'Binary',op,left,right};
+    }
+    return left;
+  }
+  parseUnary(){
+    if(this.peek().type==='MINUS'||this.peek().type==='NOT'||(this.peek().type==='KEYWORD'&&this.peek().value==='not')){
+      const op=this.next().value;const arg=this.parseUnary();return{type:'Unary',op,arg};
+    }
+    return this.parsePostfix();
+  }
+  parsePostfix(){
+    let expr=this.parsePrimary();
+    while(this.peek().type==='DOT'){
+      this.next();const prop=this.expect('IDENT').value;
+      if(this.peek().type==='LPAREN'){
+        const args=this.parseArgs();
+        expr={type:'MethodCall',object:expr,method:prop,args};
+      } else expr={type:'Member',object:expr,property:prop};
+    }
+    return expr;
+  }
+  parseArgs(){
+    this.expect('LPAREN');const args=[];
+    while(this.peek().type!=='RPAREN'){args.push(this.parseExpr());if(!this.match('COMMA'))break;}
+    this.expect('RPAREN');return args;
+  }
+  parsePrimary(){
+    const t=this.peek();
+    if(t.type==='NUMBER'){this.next();return{type:'Number',value:t.value};}
+    if(t.type==='STRING'){this.next();return{type:'String',value:t.value};}
+    if(t.type==='KEYWORD'){
+      if(t.value==='true'){this.next();return{type:'Bool',value:true};}
+      if(t.value==='false'){this.next();return{type:'Bool',value:false};}
+      if(t.value==='null'){this.next();return{type:'Null'};}
+    }
+    if(t.type==='IDENT'){
+      this.next();
+      if(this.peek().type==='LPAREN'){const args=this.parseArgs();return{type:'Call',name:t.value,args};}
+      return{type:'Ident',name:t.value};
+    }
+    if(t.type==='LPAREN'){this.next();const e=this.parseExpr();this.expect('RPAREN');return e;}
+    if(t.type==='LBRACKET'){this.next();const items=[];while(this.peek().type!=='RBRACKET'){items.push(this.parseExpr());if(!this.match('COMMA'))break;}this.expect('RBRACKET');return{type:'Array',items};}
+    throw new Error('Unexpected: '+t.type+' '+t.value);
+  }
+}
+
+/* ============================================================
+   TRANSPILERS
+   ============================================================ */
+const PyTranspiler = {
+  transpile(src){
+    const lines=src.split('\n');const out=[];const stack=[];
+    const openBlocks=(level)=>{
+      while(stack.length&&stack[stack.length-1].indent>level){stack.pop();out.push('  '.repeat(stack.length)+'}');}
+    };
+    for(const raw of lines){
+      if(raw.trim()===''||raw.trim().startsWith('#'))continue;
+      const indent=raw.match(/^\s*/)[0].length;
+      const line=raw.trim();
+      openBlocks(indent);
+      if(line.startsWith('def ')){
+        const m=line.match(/^def\s+(\w+)\s*\(([^)]*)\)\s*:$/);
+        if(m){out.push('  '.repeat(stack.length)+`function ${m[1]}(${m[2]}) {`);stack.push({indent:indent+1});continue;}
+      }
+      if(line.startsWith('if ')){
+        const m=line.match(/^if\s+(.+):$/);
+        if(m){out.push('  '.repeat(stack.length)+`if (${m[1]}) {`);stack.push({indent:indent+1});continue;}
+      }
+      if(line.startsWith('elif ')){
+        const m=line.match(/^elif\s+(.+):$/);
+        if(m){out.push('  '.repeat(stack.length)+`} else if (${m[1]}) {`);continue;}
+      }
+      if(line==='else:'){
+        out.push('  '.repeat(stack.length)+'} else {');stack.push({indent:indent+1});continue;
+      }
+      if(line.startsWith('while ')){
+        const m=line.match(/^while\s+(.+):$/);
+        if(m){out.push('  '.repeat(stack.length)+`while (${m[1]}) {`);stack.push({indent:indent+1});continue;}
+      }
+      if(line==='return'||line.startsWith('return ')){
+        out.push('  '.repeat(stack.length)+line+';');continue;
+      }
+      if(line==='break'){out.push('  '.repeat(stack.length)+'break;');continue;}
+      if(line==='continue'){out.push('  '.repeat(stack.length)+'continue;');continue;}
+      if(line==='pass'){out.push('  '.repeat(stack.length)+';');continue;}
+      const assignM=line.match(/^([a-zA-Z_]\w*)\s*=\s*(.+)$/);
+      if(assignM&&!line.includes('==')){out.push('  '.repeat(stack.length)+`let ${assignM[1]} = ${assignM[2]};`);continue;}
+      out.push('  '.repeat(stack.length)+line+';');
+    }
+    while(stack.length){stack.pop();out.push('  '.repeat(stack.length)+'}');}
+    return out.join('\n');
+  },
+};
+
+const CppTranspiler = {
+  transpile(src){
+    let s=src;
+    s=s.replace(/^\s*#.*$/gm,'');
+    s=s.replace(/\bvoid\s+(\w+)\s*\(/g,'function $1(');
+    s=s.replace(/\b(int|float|double|bool|auto|string)\s+(\w+)\s*=/g,'let $2 =');
+    s=s.replace(/\b(int|float|double|bool|auto|string)\s+(\w+)\s*;/g,'let $2;');
+    s=s.replace(/std::cout\s*<<\s*(.+?)\s*<<\s*std::endl\s*;/g,'print($1);');
+    s=s.replace(/cout\s*<<\s*(.+?)\s*<<\s*endl\s*;/g,'print($1);');
+    s=s.replace(/<<\s*endl/g,'');
+    s=s.replace(/<<\s*/g,'+');
+    s=s.replace(/std::/g,'');
+    s=s.replace(/\bnullptr\b/g,'null');
+    s=s.replace(/->/g,'.');
+    return s;
+  },
+};
+
+/* ============================================================
+   INTERPRETER
+   ============================================================ */
+class Environment {
+  constructor(parent=null){this.vars=new Map();this.parent=parent;}
+  get(name){
+    if(this.vars.has(name))return this.vars.get(name);
+    if(this.parent)return this.parent.get(name);
+    return undefined;
+  }
+  set(name,value){this.vars.set(name,value);return value;}
+  has(name){return this.vars.has(name)||(this.parent?this.parent.has(name):false);}
+}
+class ReturnSignal{constructor(v){this.value=v;}}
+class BreakSignal{}
+class ContinueSignal{}
+
+class Interpreter {
+  constructor(api={}){
+    this.global=new Environment();
+    this.api=api;
+    this.callDepth=0;
+    this.maxCallDepth=100;
+    this.steps=0;
+    this.maxSteps=50000;
+    this.setup();
+  }
+  setup(){
+    const g=this.global;
+    g.set('PI',Math.PI);
+    g.set('print',(...a)=>{const s=a.join(' ');Logger.info('[script] '+s);});
+    g.set('log',(...a)=>{const s=a.join(' ');Logger.info('[script] '+s);});
+    g.set('warn',(...a)=>Logger.warn('[script] '+a.join(' ')));
+    g.set('error',(...a)=>Logger.error('[script] '+a.join(' ')));
+    g.set('random',(a=0,b=1)=>U.rand(a,b));
+    g.set('randInt',(a,b)=>Math.floor(U.rand(a,b+1)));
+    g.set('sin',Math.sin);g.set('cos',Math.cos);g.set('tan',Math.tan);
+    g.set('abs',Math.abs);g.set('floor',Math.floor);g.set('ceil',Math.ceil);
+    g.set('round',Math.round);g.set('sqrt',Math.sqrt);
+    g.set('min',Math.min);g.set('max',Math.max);g.set('pow',Math.pow);
+    g.set('len',a=>a.length);
+    g.set('push',(a,v)=>{a.push(v);return a.length;});
+    g.set('Math',Math);
+    g.set('String',String);g.set('Number',Number);
+    g.set('JSON',JSON);
+    for(const [k,v] of Object.entries(this.api))g.set(k,v);
+  }
+  run(ast){
+    try{this.execBlock(ast.body,this.global);}
+    catch(e){
+      if(e instanceof ReturnSignal)return e.value;
+      Logger.error('Script: '+e.message);
+    }
+    return null;
+  }
+  step(){
+    if(++this.steps>this.maxSteps)throw new Error('Превышен лимит шагов ('+this.maxSteps+')');
+  }
+  execBlock(body,env){
+    for(const stmt of body){
+      this.step();
+      const r=this.execStmt(stmt,env);
+      if(r instanceof ReturnSignal||r instanceof BreakSignal||r instanceof ContinueSignal)return r;
+    }
+    return null;
+  }
+  execStmt(node,env){
+    switch(node.type){
+      case 'VarDecl':{const v=node.init?this.evalExpr(node.init,env):undefined;env.set(node.name,v);return null;}
+      case 'FuncDecl':{
+        const self=this;
+        const fn=(...args)=>{
+          self.step();
+          if(++self.callDepth>self.maxCallDepth)throw new Error('Stack overflow');
+          const local=new Environment(env);
+          node.params.forEach((p,i)=>local.set(p,args[i]));
+          try{const r=self.execBlock(node.body.body,local);if(r instanceof ReturnSignal)return r.value;return null;}
+          finally{self.callDepth--;}
+        };
+        env.set(node.name,fn);return null;
+      }
+      case 'If':{
+        if(this.evalExpr(node.cond,env))return this.execBlock(node.cons.body,new Environment(env));
+        if(node.alt)return this.execBlock(node.alt.body,new Environment(env));
+        return null;
+      }
+      case 'While':{
+        let g=0;
+        while(this.evalExpr(node.cond,env)){
+          this.step();if(++g>this.maxSteps)throw new Error('Infinite while');
+          const r=this.execBlock(node.body.body,new Environment(env));
+          if(r instanceof ReturnSignal)return r;
+          if(r instanceof BreakSignal)break;
+        }
+        return null;
+      }
+      case 'ForIn':{
+        const iter=this.evalExpr(node.iter,env);
+        const arr=Array.isArray(iter)?iter:(typeof iter==='object'&&iter?Object.values(iter):[]);
+        for(const v of arr){
+          this.step();
+          const local=new Environment(env);local.set(node.varName,v);
+          const r=this.execBlock(node.body.body,local);
+          if(r instanceof ReturnSignal)return r;
+          if(r instanceof BreakSignal)break;
+        }
+        return null;
+      }
+      case 'Return':return new ReturnSignal(node.arg?this.evalExpr(node.arg,env):null);
+      case 'Break':return new BreakSignal();
+      case 'Continue':return new ContinueSignal();
+      case 'ExprStatement':this.evalExpr(node.expr,env);return null;
+      case 'Block':return this.execBlock(node.body,new Environment(env));
+    }
+    return null;
+  }
+  evalExpr(node,env){
+    switch(node.type){
+      case 'Number':return node.value;
+      case 'String':return node.value;
+      case 'Bool':return node.value;
+      case 'Null':return null;
+      case 'Ident':{
+        const v=env.get(node.name);
+        if(v===undefined){const g=this.global.get(node.name);return g;}
+        return v;
+      }
+      case 'Array':return node.items.map(it=>this.evalExpr(it,env));
+      case 'Binary':{
+        const l=this.evalExpr(node.left,env);
+        if(node.op==='&&')return l?this.evalExpr(node.right,env):l;
+        if(node.op==='||')return l?l:this.evalExpr(node.right,env);
+        const r=this.evalExpr(node.right,env);
+        switch(node.op){
+          case '+':return l+r;case '-':return l-r;case '*':return l*r;
+          case '/':return l/r;case '%':return l%r;
+          case '==':return l==r;case '!=':return l!=r;
+          case '<':return l<r;case '>':return l>r;
+          case '<=':return l<=r;case '>=':return l>=r;
+        }
+        return null;
+      }
+      case 'Unary':{
+        const v=this.evalExpr(node.arg,env);
+        switch(node.op){case '-':return -v;case '!':return !v;case 'not':return !v;}
+        return v;
+      }
+      case 'Assign':{
+        const v=this.evalExpr(node.value,env);
+        if(node.target.type==='Ident')env.set(node.target.name,v);
+        else if(node.target.type==='Member'){
+          const obj=this.evalExpr(node.target.object,env);
+          if(obj)obj[node.target.property]=v;
+        }
+        return v;
+      }
+      case 'Member':{
+        const obj=this.evalExpr(node.object,env);
+        return obj?obj[node.property]:undefined;
+      }
+      case 'Call':{
+        const fn=this.evalExpr({type:'Ident',name:node.name},env);
+        if(typeof fn!=='function')throw new Error(`"${node.name}" не функция`);
+        return fn(...node.args.map(a=>this.evalExpr(a,env)));
+      }
+      case 'MethodCall':{
+        const obj=this.evalExpr(node.object,env);
+        if(!obj)throw new Error('Вызов метода у null');
+        const fn=obj[node.method];
+        if(typeof fn!=='function')throw new Error(`Метод "${node.method}" не найден`);
+        return fn.apply(obj,node.args.map(a=>this.evalExpr(a,env)));
+      }
+    }
+    return null;
+  }
+}
+
+/* ============================================================
+   SCRIPT HOST
+   ============================================================ */
+class ScriptHost {
+  constructor(){this.instances=new Map();}
+  compile(obj){
+    const src=obj.script||'';
+    if(!src.trim())return false;
+    try{
+      let code=src;
+      if(obj.lang==='python')code=PyTranspiler.transpile(src);
+      else if(obj.lang==='cpp')code=CppTranspiler.transpile(src);
+      const tokens=Tokenizer.tokenize(code);
+      const parser=new Parser(tokens);
+      const ast=parser.parseProgram();
+      const api=this.buildAPI(obj);
+      const interp=new Interpreter(api);
+      interp.run(ast);
+      const lifecycle={};
+      ['onStart','onUpdate','onDestroy','onClick','onCollision','onKey'].forEach(name=>{
+        const fn=interp.global.get(name);
+        if(typeof fn==='function')lifecycle[name]=fn;
+      });
+      this.instances.set(obj.id,{interpreter:interp,lifecycle,obj});
+      if(lifecycle.onStart)try{lifecycle.onStart();}catch(e){Logger.error('onStart: '+e.message);}
+      Logger.info(`Скрипт OK (${obj.lang}): ${obj.name}`);
+      return true;
+    }catch(e){
+      Logger.error(`Ошибка ${obj.name}: ${e.message}`);
+      return false;
+    }
+  }
+  buildAPI(obj){
+    const t=obj.transform,r=obj.material;
+    return {
+      get x(){return t.x;},set x(v){t.x=v;},
+      get y(){return t.y;},set y(v){t.y=v;},
+      get z(){return t.z;},set z(v){t.z=v;},
+      get rx(){return t.rx;},set rx(v){t.rx=v;},
+      get ry(){return t.ry;},set ry(v){t.ry=v;},
+      get rz(){return t.rz;},set rz(v){t.rz=v;},
+      get sx(){return t.sx;},set sx(v){t.sx=v;},
+      get sy(){return t.sy;},set sy(v){t.sy=v;},
+      get sz(){return t.sz;},set sz(v){t.sz=v;},
+      get opacity(){return r.opacity;},set opacity(v){r.opacity=v;},
+      get color(){return r.color;},set color(v){r.color=v;},
+      get name(){return obj.name;},
+      get vx(){return obj.userData.vx||0;},set vx(v){obj.userData.vx=v;},
+      get vy(){return obj.userData.vy||0;},set vy(v){obj.userData.vy=v;},
+      get vz(){return obj.userData.vz||0;},set vz(v){obj.userData.vz=v;},
+      spawn(type,props){
+        const o=Editor.createObject(type,props||{});
+        return o;
+      },
+      destroy(){Editor.deleteObject(obj);},
+      distance(o){
+        return U.dist(t.x,t.y,t.z,o.transform.x,o.transform.y,o.transform.z);
+      },
+      findByName(n){return Editor.scene.objects.find(o=>o.name===n);},
+      findByTag(tg){return Editor.scene.objects.filter(o=>o.tags&&o.tags.includes(tg));},
+      time:0,dt:0,
+      keys:Editor.keys,
+      mouse:Editor.mouse,
+      userData:obj.userData,
+    };
+  }
+  update(obj,dt){
+    const inst=this.instances.get(obj.id);
+    if(!inst)return;
+    const {interpreter,lifecycle}=inst;
+    interpreter.global.set('time',performance.now()/1000);
+    interpreter.global.set('dt',dt);
+    if(lifecycle.onUpdate){
+      interpreter.steps=0;
+      try{lifecycle.onUpdate(dt);}
+      catch(e){Logger.error('onUpdate: '+e.message);this.instances.delete(obj.id);}
+    }
+  }
+  fire(obj,event,...args){
+    const inst=this.instances.get(obj.id);
+    if(!inst)return;
+    const fn=inst.lifecycle[event];
+    if(fn){
+      inst.interpreter.steps=0;
+      try{fn(...args);}catch(e){Logger.error(event+': '+e.message);}
+    }
+  }
+  destroy(id){
+    const inst=this.instances.get(id);
+    if(inst&&inst.lifecycle.onDestroy){
+      try{inst.lifecycle.onDestroy();}catch(e){Logger.error('onDestroy: '+e.message);}
+    }
+    this.instances.delete(id);
+  }
+  clear(){this.instances.clear();}
+}
+
+/* ============================================================
+   SCENE OBJECT
+   ============================================================ */
+class SceneObject {
+  constructor(type,opts={}){
+    this.id=U.uid();
+    this.type=type;
+    this.name=opts.name||(type.charAt(0).toUpperCase()+type.slice(1)+'_'+this.id.slice(0,4));
+    this.visible=true;
+    this.transform={
+      x:opts.x??0,y:opts.y??0,z:opts.z??0,
+      rx:opts.rx??0,ry:opts.ry??0,rz:opts.rz??0,
+      sx:opts.sx??1,sy:opts.sy??1,sz:opts.sz??1,
+    };
+    this.material={
+      color:opts.color??'#5b8def',
+      opacity:opts.opacity??1,
+      metallic:opts.metallic??0.2,
+      roughness:opts.roughness??0.6,
+    };
+    this.geometry=opts.geometry||this.defaultGeometry(type);
+    this.script=opts.script||'';
+    this.lang=opts.lang||'type';
+    this.tags=opts.tags||[];
+    this.userData=opts.userData||{};
+    this.glBuffers=null;
+    this.isLight=type==='light';
+    this.isCamera=type==='camera';
+  }
+  defaultGeometry(type){
+    switch(type){
+      case 'cube':return Primitives.cube(1);
+      case 'sphere':return Primitives.sphere(0.5,20,12);
+      case 'cylinder':return Primitives.cylinder(0.4,1,20);
+      case 'cone':return Primitives.cone(0.5,1,20);
+      case 'torus':return Primitives.torus(0.4,0.15,24,12);
+      case 'plane':return Primitives.plane(4);
+      case 'light':return Primitives.sphere(0.1,8,6);
+      case 'camera':return Primitives.cube(0.3);
+      case 'player':return Primitives.cube(0.8);
+      case 'zombie':return Primitives.cube(0.8);
+      case 'bullet':return Primitives.sphere(0.1,8,6);
+      default:return Primitives.cube(1);
+    }
+  }
+  getMatrix(){
+    return M4.compose(
+      this.transform.x,this.transform.y,this.transform.z,
+      this.transform.rx,this.transform.ry,this.transform.rz,
+      this.transform.sx,this.transform.sy,this.transform.sz
+    );
+  }
+  toJSON(){
+    return {
+      id:this.id,type:this.type,name:this.name,visible:this.visible,
+      transform:{...this.transform},
+      material:{...this.material},
+      geometry:{
+        positions:Array.from(this.geometry.positions),
+        normals:Array.from(this.geometry.normals),
+        indices:Array.from(this.geometry.indices),
+      },
+      script:this.script,lang:this.lang,tags:this.tags,userData:this.userData,
+    };
+  }
+  static fromJSON(j){
+    const o=new SceneObject(j.type,j);
+    o.id=j.id;o.visible=j.visible;
+    return o;
+  }
+}
+
+/* ============================================================
+   SCENE
+   ============================================================ */
+class Scene {
+  constructor(){
+    this.objects=[];
+    this.backgroundColor='#0a0a14';
+    this.ambient=0.3;
+  }
+  add(obj){this.objects.push(obj);return obj;}
+  remove(obj){const i=this.objects.indexOf(obj);if(i>=0)this.objects.splice(i,1);}
+  toJSON(){return{objects:this.objects.map(o=>o.toJSON()),backgroundColor:this.backgroundColor,ambient:this.ambient};}
+  static fromJSON(j){
+    const s=new Scene();
+    s.objects=(j.objects||[]).map(SceneObject.fromJSON);
+    s.backgroundColor=j.backgroundColor||'#0a0a14';
+    s.ambient=j.ambient??0.3;
+    return s;
+  }
+}
+
+/* ============================================================
+   WEBGL RENDERER
+   ============================================================ */
+class GLRenderer {
+  constructor(canvas){
+    this.canvas=canvas;
+    this.gl=canvas.getContext('webgl',{antialias:true,alpha:false});
+    if(!this.gl)throw new Error('WebGL не поддерживается');
+    this.dpr=window.devicePixelRatio||1;
+    this.program=null;
+    this.wireProgram=null;
+    this.init();
+  }
+  init(){
+    const gl=this.gl;
+    const vs=`attribute vec3 aPos;attribute vec3 aNormal;uniform mat4 uModel;uniform mat4 uView;uniform mat4 uProj;varying vec3 vNormal;varying vec3 vWorldPos;void main(){vec4 wp=uModel*vec4(aPos,1.0);vWorldPos=wp.xyz;vNormal=mat3(uModel)*aNormal;gl_Position=uProj*uView*wp;}`;
+    const fs=`precision mediump float;varying vec3 vNormal;varying vec3 vWorldPos;uniform vec3 uColor;uniform float uOpacity;uniform vec3 uLightDir;uniform vec3 uCameraPos;uniform float uMetallic;uniform float uRoughness;uniform float uAmbient;void main(){vec3 n=normalize(vNormal);float diff=max(dot(n,uLightDir),0.0);vec3 viewDir=normalize(uCameraPos-vWorldPos);vec3 halfDir=normalize(uLightDir+viewDir);float spec=pow(max(dot(n,halfDir),0.0),mix(8.0,64.0,1.0-uRoughness))*uMetallic;vec3 ambient=vec3(uAmbient*0.8,uAmbient*0.85,uAmbient);vec3 col=uColor*(ambient+diff*0.9)+vec3(spec);gl_FragColor=vec4(col,uOpacity);}`;
+    this.program=this.createProgram(vs,fs);
+    const wvs=`attribute vec3 aPos;uniform mat4 uModel;uniform mat4 uView;uniform mat4 uProj;void main(){gl_Position=uProj*uView*uModel*vec4(aPos,1.0);}`;
+    const wfs=`precision mediump float;uniform vec3 uColor;void main(){gl_FragColor=vec4(uColor,1.0);}`;
+    this.wireProgram=this.createProgram(wvs,wfs);
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.CULL_FACE);
+    gl.cullFace(gl.BACK);
+    gl.clearColor(0.04,0.04,0.08,1);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+  }
+  createProgram(vs,fs){
+    const gl=this.gl;
+    const v=this.compileShader(gl.VERTEX_SHADER,vs);
+    const f=this.compileShader(gl.FRAGMENT_SHADER,fs);
+    const p=gl.createProgram();
+    gl.attachShader(p,v);gl.attachShader(p,f);gl.linkProgram(p);
+    if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  }
+  compileShader(type,src){
+    const gl=this.gl;
+    const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  uploadMesh(obj){
+    if(obj.glBuffers)return;
+    const gl=this.gl;
+    const g=obj.geometry;
+    const pos=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,pos);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(g.positions),gl.STATIC_DRAW);
+    const norm=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,norm);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(g.normals),gl.STATIC_DRAW);
+    const idx=gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,idx);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(g.indices),gl.STATIC_DRAW);
+    obj.glBuffers={pos,norm,idx};
+  }
+  resize(w,h){
+    this.canvas.width=w*this.dpr;
+    this.canvas.height=h*this.dpr;
+    this.canvas.style.width=w+'px';
+    this.canvas.style.height=h+'px';
+    this.gl.viewport(0,0,this.canvas.width,this.canvas.height);
+  }
+  render(scene,camera,editor){
+    const gl=this.gl;
+    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    const {eye,view,proj}=camera;
+    const {program}=this;
+    gl.useProgram(program);
+    const uModel=gl.getUniformLocation(program,'uModel');
+    const uView=gl.getUniformLocation(program,'uView');
+    const uProj=gl.getUniformLocation(program,'uProj');
+    const uColor=gl.getUniformLocation(program,'uColor');
+    const uOpacity=gl.getUniformLocation(program,'uOpacity');
+    const uLightDir=gl.getUniformLocation(program,'uLightDir');
+    const uCameraPos=gl.getUniformLocation(program,'uCameraPos');
+    const uMetallic=gl.getUniformLocation(program,'uMetallic');
+    const uRoughness=gl.getUniformLocation(program,'uRoughness');
+    const uAmbient=gl.getUniformLocation(program,'uAmbient');
+    const aPos=gl.getAttribLocation(program,'aPos');
+    const aNormal=gl.getAttribLocation(program,'aNormal');
+    gl.uniformMatrix4fv(uView,false,view);
+    gl.uniformMatrix4fv(uProj,false,proj);
+    gl.uniform3f(uLightDir,0.5,0.8,0.3);
+    gl.uniform3fv(uCameraPos,eye);
+    gl.uniform1f(uAmbient,scene.ambient);
+    this.drawGrid(view,proj);
+    for(const obj of scene.objects){
+      if(!obj.visible)continue;
+      if(obj.isLight)continue;
+      this.uploadMesh(obj);
+      const b=obj.glBuffers;
+      const m=obj.getMatrix();
+      gl.uniformMatrix4fv(uModel,false,m);
+      gl.bindBuffer(gl.ARRAY_BUFFER,b.pos);
+      gl.enableVertexAttribArray(aPos);
+      gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,0,0);
+      gl.bindBuffer(gl.ARRAY_BUFFER,b.norm);
+      gl.enableVertexAttribArray(aNormal);
+      gl.vertexAttribPointer(aNormal,3,gl.FLOAT,false,0,0);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,b.idx);
+      const col=this.hexToRGB(obj.material.color);
+      gl.uniform3fv(uColor,col);
+      gl.uniform1f(uOpacity,obj.material.opacity);
+      gl.uniform1f(uMetallic,obj.material.metallic);
+      gl.uniform1f(uRoughness,obj.material.roughness);
+      gl.drawElements(gl.TRIANGLES,obj.geometry.indices.length,gl.UNSIGNED_SHORT,0);
+      if(obj===editor.selected){
+        this.drawOutline(b,m,view,proj);
+      }
+    }
+  }
+  drawOutline(buffers,model,view,proj){
+    const gl=this.gl;
+    const p=this.wireProgram;
+    gl.useProgram(p);
+    const wModel=gl.getUniformLocation(p,'uModel');
+    const wView=gl.getUniformLocation(p,'uView');
+    const wProj=gl.getUniformLocation(p,'uProj');
+    const wColor=gl.getUniformLocation(p,'uColor');
+    const wPos=gl.getAttribLocation(p,'aPos');
+    gl.uniformMatrix4fv(wModel,false,model);
+    gl.uniformMatrix4fv(wView,false,view);
+    gl.uniformMatrix4fv(wProj,false,proj);
+    gl.uniform3f(wColor,1.0,0.65,0.2);
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffers.pos);
+    gl.enableVertexAttribArray(wPos);
+    gl.vertexAttribPointer(wPos,3,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers.idx);
+    gl.drawElements(gl.LINE_LOOP,0,gl.UNSIGNED_SHORT,0);
+    gl.useProgram(this.program);
+  }
+  drawGrid(view,proj){
+    const gl=this.gl;
+    const p=this.wireProgram;
+    gl.useProgram(p);
+    const wModel=gl.getUniformLocation(p,'uModel');
+    const wView=gl.getUniformLocation(p,'uView');
+    const wProj=gl.getUniformLocation(p,'uProj');
+    const wColor=gl.getUniformLocation(p,'uColor');
+    const wPos=gl.getAttribLocation(p,'aPos');
+    gl.uniformMatrix4fv(wModel,false,M4.identity());
+    gl.uniformMatrix4fv(wView,false,view);
+    gl.uniformMatrix4fv(wProj,false,proj);
+    gl.uniform3f(wColor,0.14,0.14,0.18);
+    const verts=[];const range=10;
+    for(let i=-range;i<=range;i++){
+      verts.push(i,0,-range,i,0,range);
+      verts.push(-range,0,i,range,0,i);
+    }
+    const buf=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(wPos);
+    gl.vertexAttribPointer(wPos,3,gl.FLOAT,false,0,0);
+    gl.drawArrays(gl.LINES,0,verts.length/3);
+    gl.uniform3f(wColor,0.75,0.25,0.35);
+    const ax=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,ax);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,0,0,3,0,0]),gl.STATIC_DRAW);
+    gl.vertexAttribPointer(wPos,3,gl.FLOAT,false,0,0);
+    gl.drawArrays(gl.LINES,0,2);
+    gl.uniform3f(wColor,0.35,0.75,0.35);
+    const ay=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,ay);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,0,0,0,3,0]),gl.STATIC_DRAW);
+    gl.vertexAttribPointer(wPos,3,gl.FLOAT,false,0,0);
+    gl.drawArrays(gl.LINES,0,2);
+    gl.uniform3f(wColor,0.35,0.55,0.95);
+    const az=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,az);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,0,0,0,0,3]),gl.STATIC_DRAW);
+    gl.vertexAttribPointer(wPos,3,gl.FLOAT,false,0,0);
+    gl.drawArrays(gl.LINES,0,2);
+    gl.useProgram(this.program);
+  }
+  hexToRGB(hex){
+    const h=hex.replace('#','');
+    return[parseInt(h.substr(0,2),16)/255,parseInt(h.substr(2,2),16)/255,parseInt(h.substr(4,2),16)/255];
+  }
+  pick(scene,screenX,screenY,camera){
+    const invProj=M4.invert(camera.proj);
+    const invView=M4.invert(camera.view);
+    const rect=this.canvas.getBoundingClientRect();
+    const ndcX=(screenX/rect.width)*2-1;
+    const ndcY=-((screenY/rect.height)*2-1);
+    const rayClip=[ndcX,ndcY,-1,1];
+    const rayEye=mulMV(invProj,rayClip);
+    rayEye[0]/=rayEye[3];rayEye[1]/=rayEye[3];rayEye[2]/=rayEye[3];
+    const rayWorld=mulMV(invView,[rayEye[0],rayEye[1],rayEye[2],0]);
+    const dir=V3.norm([rayWorld[0],rayWorld[1],rayWorld[2]]);
+    let closest=null,closestT=Infinity;
+    for(const obj of scene.objects){
+      if(!obj.visible||obj.isLight)continue;
+      const center=[obj.transform.x,obj.transform.y,obj.transform.z];
+      const radius=Math.max(obj.transform.sx,obj.transform.sy,obj.transform.sz)*boundingRadius(obj.geometry);
+      const oc=[camera.eye[0]-center[0],camera.eye[1]-center[1],camera.eye[2]-center[2]];
+      const b=V3.dot(oc,dir);
+      const c=V3.dot(oc,oc)-radius*radius;
+      const disc=b*b-c;
+      if(disc<0)continue;
+      const t=-b-Math.sqrt(disc);
+      if(t>0&&t<closestT){closestT=t;closest=obj;}
+    }
+    return closest;
+  }
+}
+
+/* ============================================================
+   MODELER (встроенный 3D-редактор)
+   ============================================================ */
+const Modeler = {
+  modalEl:null,
+  renderer:null,
+  meshes:[],
+  selected:null,
+  camera:{yaw:0.7,pitch:0.5,dist:5,target:[0,0.5,0]},
+  saved:false,
+
+  open(){
+    const backdrop=document.getElementById('modal-backdrop');
+    const modal=document.getElementById('modal');
+    modal.classList.add('full');
+    document.getElementById('modal-title').textContent='🧊 3D-моделлер';
+    const body=document.getElementById('modal-body');
+    body.classList.add('nopad');
+    body.innerHTML=`
+      <div class="editor3d-layout" style="height:100%">
+        <div class="editor3d-left">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#6a6a7a;margin-bottom:8px;font-weight:600">Примитивы</div>
+          <div class="prim-list">
+            <button class="prim-btn" data-prim="cube">⬛ Куб</button>
+            <button class="prim-btn" data-prim="sphere">⚪ Сфера</button>
+            <button class="prim-btn" data-prim="cylinder">🛢 Цилиндр</button>
+            <button class="prim-btn" data-prim="cone">🔺 Конус</button>
+            <button class="prim-btn" data-prim="torus">⭕ Тор</button>
+            <button class="prim-btn" data-prim="plane">▭ Плоскость</button>
+          </div>
+          <div style="margin-top:14px;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#6a6a7a;margin-bottom:8px;font-weight:600">Действия</div>
+          <button class="modal-btn" id="mdl-clear" style="width:100%;margin-bottom:4px">Очистить</button>
+          <button class="modal-btn" id="mdl-duplicate" style="width:100%;margin-bottom:4px">Дублировать</button>
+          <button class="modal-btn" id="mdl-delete" style="width:100%">Удалить</button>
+        </div>
+        <div class="editor3d-center">
+          <canvas id="mdl-canvas"></canvas>
+        </div>
+        <div class="editor3d-right">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#6a6a7a;margin-bottom:8px;font-weight:600">Трансформа</div>
+          <div class="insp-row"><label style="min-width:52px">Pos</label>
+            <div class="vec-row">
+              <input class="insp-input num" type="number" step="0.1" data-md="px" value="0">
+              <input class="insp-input num" type="number" step="0.1" data-md="py" value="0">
+              <input class="insp-input num" type="number" step="0.1" data-md="pz" value="0">
+            </div>
+          </div>
+          <div class="insp-row"><label style="min-width:52px">Rot</label>
+            <div class="vec-row">
+              <input class="insp-input num" type="number" step="5" data-md="rx" value="0">
+              <input class="insp-input num" type="number" step="5" data-md="ry" value="0">
+              <input class="insp-input num" type="number" step="5" data-md="rz" value="0">
+            </div>
+          </div>
+          <div class="insp-row"><label style="min-width:52px">Scale</label>
+            <div class="vec-row">
+              <input class="insp-input num" type="number" step="0.1" data-md="sx" value="1">
+              <input class="insp-input num" type="number" step="0.1" data-md="sy" value="1">
+              <input class="insp-input num" type="number" step="0.1" data-md="sz" value="1">
+            </div>
+          </div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#6a6a7a;margin:14px 0 8px;font-weight:600">Материал</div>
+          <div class="insp-row"><label>Цвет</label><input class="insp-color" type="color" data-md="color" value="#5b8def"></div>
+          <div class="insp-row"><label>Металл</label><input class="insp-input num" type="number" min="0" max="1" step="0.05" data-md="metallic" value="0.2"></div>
+          <div class="insp-row"><label>Шерох.</label><input class="insp-input num" type="number" min="0" max="1" step="0.05" data-md="roughness" value="0.6"></div>
+          <div style="margin-top:14px;font-size:11px;color:#8a8a9a">
+            <div>Вершин: <span id="mdl-verts">—</span></div>
+            <div>Полигонов: <span id="mdl-tris">—</span></div>
+          </div>
+          <div style="margin-top:16px;font-size:10px;color:#5a5a6a;line-height:1.5">
+            ЛКМ+drag — орбита<br>
+            ПКМ+drag — пан<br>
+            Колесо — зум
+          </div>
+        </div>
+      </div>
+    `;
+    document.getElementById('modal-footer').innerHTML=`
+      <button class="modal-btn" id="mdl-cancel">Отмена</button>
+      <button class="modal-btn primary" id="mdl-save">💾 Сохранить как .type</button>
+    `;
+    backdrop.classList.add('on');
+
+    const canvas=document.getElementById('mdl-canvas');
+    this.renderer=new GLRenderer(canvas);
+    this.resize();
+    requestAnimationFrame(()=>this.resize());
+
+    this.meshes=[];
+    this.selected=null;
+    const cube=this.makeMesh('cube','Cube_1',[0,0.5,0],'#e94560');
+    this.meshes.push(cube);
+    this.select(cube);
+
+    body.querySelectorAll('.prim-btn').forEach(b=>{
+      b.addEventListener('click',()=>{
+        const type=b.dataset.prim;
+        const colors=['#e94560','#5b8def','#f2a65a','#5ac86a','#9b6bff','#e8c86a'];
+        const m=this.makeMesh(type,type.charAt(0).toUpperCase()+type.slice(1)+'_'+this.meshes.length,[U.rand(-1.5,1.5),0.5,U.rand(-1.5,1.5)],colors[Math.floor(Math.random()*colors.length)]);
+        this.meshes.push(m);
+        this.select(m);
+        this.animateModeler();
+      });
+    });
+    body.querySelectorAll('[data-md]').forEach(inp=>{
+      inp.addEventListener('input',()=>this.applyInspector());
+    });
+    document.getElementById('mdl-clear').onclick=()=>{this.meshes=[];this.selected=null;this.render();this.updateInfo();};
+    document.getElementById('mdl-duplicate').onclick=()=>this.duplicate();
+    document.getElementById('mdl-delete').onclick=()=>this.deleteSel();
+    document.getElementById('mdl-cancel').onclick=()=>this.close();
+    document.getElementById('mdl-save').onclick=()=>this.saveAsType();
+
+    this.setupModelerInput(canvas);
+    this.animateModeler();
+  },
+
+  makeMesh(type,name,pos,color){
+    const geom=Primitives[type]();
+    return {
+      type,name,
+      position:pos,
+      rotation:[0,0,0],
+      scale:[1,1,1],
+      material:{color,opacity:1,metallic:0.2,roughness:0.6},
+      geometry:geom,
+      glBuffers:null,
+      visible:true,
+      getMatrix(){return M4.compose(this.position[0],this.position[1],this.position[2],this.rotation[0],this.rotation[1],this.rotation[2],this.scale[0],this.scale[1],this.scale[2]);},
+      transform:{x:0,y:0,z:0},
+    };
+  },
+
+  resize(){
+    if(!this.renderer)return;
+    const canvas=this.renderer.canvas;
+    const rect=canvas.parentElement.getBoundingClientRect();
+    this.renderer.resize(rect.width,rect.height);
+    this.render();
+  },
+
+  render(){
+    if(!this.renderer)return;
+    const c=this.camera;
+    const cp=Math.cos(c.pitch);
+    const eye=[
+      c.target[0]+c.dist*cp*Math.sin(c.yaw),
+      c.target[1]+c.dist*Math.sin(c.pitch),
+      c.target[2]+c.dist*cp*Math.cos(c.yaw),
+    ];
+    const aspect=this.renderer.canvas.width/this.renderer.canvas.height;
+    const proj=M4.perspective(Math.PI/4,aspect,0.01,100);
+    const view=M4.lookAt(eye,c.target,[0,1,0]);
+    const fakeScene={objects:this.meshes,ambient:0.3,backgroundColor:'#0a0a14'};
+    const fakeEditor={selected:this.selected};
+    this.renderer.render(fakeScene,{eye,view,proj},fakeEditor);
+  },
+
+  animateModeler(){
+    const loop=()=>{
+      if(!this.renderer)return;
+      const backdrop=document.getElementById('modal-backdrop');
+      if(!backdrop.classList.contains('on'))return;
+      this.render();
+      requestAnimationFrame(loop);
+    };
+    loop();
+  },
+
+  setupModelerInput(canvas){
+    let drag=null,lastX=0,lastY=0;
+    canvas.addEventListener('contextmenu',e=>e.preventDefault());
+    canvas.addEventListener('mousedown',e=>{
+      if(e.button===0){
+        const rect=canvas.getBoundingClientRect();
+        const hit=this.pick(e.clientX-rect.left,e.clientY-rect.top);
+        if(hit)this.select(hit);
+        drag='orbit';lastX=e.clientX;lastY=e.clientY;
+      } else if(e.button===2){drag='pan';lastX=e.clientX;lastY=e.clientY;}
+    });
+    window.addEventListener('mousemove',e=>{
+      if(!drag)return;
+      const dx=e.clientX-lastX,dy=e.clientY-lastY;
+      lastX=e.clientX;lastY=e.clientY;
+      if(drag==='orbit'){
+        this.camera.yaw-=dx*0.01;
+        this.camera.pitch=Math.max(-1.5,Math.min(1.5,this.camera.pitch-dy*0.01));
+      } else if(drag==='pan'){
+        const c=this.camera;
+        const right=[Math.cos(c.yaw),0,-Math.sin(c.yaw)];
+        const up=[-Math.sin(c.pitch)*Math.sin(c.yaw),Math.cos(c.pitch),-Math.sin(c.pitch)*Math.cos(c.yaw)];
+        const sc=c.dist*0.002;
+        c.target[0]-=(dx*right[0]+dy*-up[0])*sc;
+        c.target[1]-=(dx*right[1]+dy*-up[1])*sc;
+        c.target[2]-=(dx*right[2]+dy*-up[2])*sc;
+      }
+    });
+    window.addEventListener('mouseup',()=>{drag=null;});
+    canvas.addEventListener('wheel',e=>{
+      e.preventDefault();
+      this.camera.dist=Math.max(0.8,Math.min(20,this.camera.dist*(1+e.deltaY*0.001)));
+    },{passive:false});
+  },
+
+  pick(sx,sy){
+    if(!this.renderer)return null;
+    const c=this.camera;
+    const cp=Math.cos(c.pitch);
+    const eye=[c.target[0]+c.dist*cp*Math.sin(c.yaw),c.target[1]+c.dist*Math.sin(c.pitch),c.target[2]+c.dist*cp*Math.cos(c.yaw)];
+    const aspect=this.renderer.canvas.width/this.renderer.canvas.height;
+    const proj=M4.perspective(Math.PI/4,aspect,0.01,100);
+    const view=M4.lookAt(eye,c.target,[0,1,0]);
+    return this.renderer.pick({objects:this.meshes},{eye,view,proj},sx,sy);
+  },
+
+  select(mesh){
+    this.selected=mesh;
+    this.updateInspector();
+    this.updateInfo();
+  },
+
+  updateInspector(){
+    if(!this.selected)return;
+    const m=this.selected;
+    document.querySelector('[data-md="px"]').value=m.position[0].toFixed(2);
+    document.querySelector('[data-md="py"]').value=m.position[1].toFixed(2);
+    document.querySelector('[data-md="pz"]').value=m.position[2].toFixed(2);
+    document.querySelector('[data-md="rx"]').value=(m.rotation[0]*180/Math.PI).toFixed(0);
+    document.querySelector('[data-md="ry"]').value=(m.rotation[1]*180/Math.PI).toFixed(0);
+    document.querySelector('[data-md="rz"]').value=(m.rotation[2]*180/Math.PI).toFixed(0);
+    document.querySelector('[data-md="sx"]').value=m.scale[0].toFixed(2);
+    document.querySelector('[data-md="sy"]').value=m.scale[1].toFixed(2);
+    document.querySelector('[data-md="sz"]').value=m.scale[2].toFixed(2);
+    document.querySelector('[data-md="color"]').value=m.material.color;
+    document.querySelector('[data-md="metallic"]').value=m.material.metallic;
+    document.querySelector('[data-md="roughness"]').value=m.material.roughness;
+  },
+
+  applyInspector(){
+    if(!this.selected)return;
+    const m=this.selected;
+    m.position=[parseFloat(document.querySelector('[data-md="px"]').value)||0,parseFloat(document.querySelector('[data-md="py"]').value)||0,parseFloat(document.querySelector('[data-md="pz"]').value)||0];
+    m.rotation=[(parseFloat(document.querySelector('[data-md="rx"]').value)||0)*Math.PI/180,(parseFloat(document.querySelector('[data-md="ry"]').value)||0)*Math.PI/180,(parseFloat(document.querySelector('[data-md="rz"]').value)||0)*Math.PI/180];
+    m.scale=[parseFloat(document.querySelector('[data-md="sx"]').value)||1,parseFloat(document.querySelector('[data-md="sy"]').value)||1,parseFloat(document.querySelector('[data-md="sz"]').value)||1];
+    m.material.color=document.querySelector('[data-md="color"]').value;
+    m.material.metallic=parseFloat(document.querySelector('[data-md="metallic"]').value)||0;
+    m.material.roughness=parseFloat(document.querySelector('[data-md="roughness"]').value)||0;
+  },
+
+  updateInfo(){
+    if(!this.selected){document.getElementById('mdl-verts').textContent='—';document.getElementById('mdl-tris').textContent='—';return;}
+    const g=this.selected.geometry;
+    document.getElementById('mdl-verts').textContent=(g.positions.length/3)|0;
+    document.getElementById('mdl-tris').textContent=(g.indices.length/3)|0;
+  },
+
+  duplicate(){
+    if(!this.selected)return;
+    const s=this.selected;
+    const m=this.makeMesh(s.type,s.name+'_copy',[s.position[0]+1,s.position[1],s.position[2]+1],s.material.color);
+    m.rotation=[...s.rotation];m.scale=[...s.scale];
+    this.meshes.push(m);this.select(m);
+  },
+
+  deleteSel(){
+    if(!this.selected)return;
+    const i=this.meshes.indexOf(this.selected);
+    if(i>=0)this.meshes.splice(i,1);
+    this.selected=this.meshes[0]||null;
+    this.select(this.selected);
+  },
+
+  close(){
+    document.getElementById('modal-backdrop').classList.remove('on');
+    document.getElementById('modal').classList.remove('full');
+    document.getElementById('modal-body').classList.remove('nopad');
+    this.renderer=null;
+  },
+
+  saveAsType(){
+    const name=prompt('Имя .type ассета:','MyModel');
+    if(!name)return;
+    const asset={
+      id:U.uid(),
+      name,
+      icon:'🧊',
+      meshes:this.meshes.map(m=>({
+        type:m.type,
+        name:m.name,
+        position:[...m.position],
+        rotation:[...m.rotation],
+        scale:[...m.scale],
+        material:{...m.material},
+        geometry:{
+          positions:Array.from(m.geometry.positions),
+          normals:Array.from(m.geometry.normals),
+          indices:Array.from(m.geometry.indices),
+        },
+      })),
+    };
+    Editor.typeAssets.push(asset);
+    Editor.refreshContentBrowser();
+    // download
+    const blob=new Blob([JSON.stringify(asset,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=name+'.type';a.click();
+    URL.revokeObjectURL(url);
+    Editor.notify('.type сохранён: '+name,'success');
+    this.close();
+  },
+};
+
+/* ============================================================
+   TEMPLATES
+   ============================================================ */
+const Templates = {
+  zombieShooter(){
+    Editor.scene.objects=[];
+    const scene=Editor.scene;
+    scene.backgroundColor='#1a1a28';
+    scene.ambient=0.25;
+
+    // ground
+    const ground=Editor.createObject('plane',{x:0,y:0,z:0,name:'Ground',sx:20,sy:1,sz:20,color:'#2a3a2a'});
+    ground.script='';
+    ground.lang='type';
+
+    // player
+    const player=Editor.createObject('cube',{
+      x:0,y:0.5,z:0,name:'Player',sx:0.8,sy:1.6,sz:0.8,color:'#5ac86a',
+    });
+    player.userData={hp:100,score:0,lastShot:0};
+    player.script=`// Player
+let yaw = 0;
+
+function onStart() {
+  hp = 100;
+  score = 0;
+  print("Player ready. WASD + mouse. Click to shoot.");
+}
+
+function onUpdate(dt) {
+  // rotation from mouse
+  yaw = mouse.lookYaw || 0;
+  ry = yaw;
+
+  // movement
+  let speed = 4 * dt;
+  let fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  let rx = Math.cos(yaw), rz = -Math.sin(yaw);
+  let mx = 0, mz = 0;
+  if (keys['w']) { mx += fx; mz += fz; }
+  if (keys['s']) { mx -= fx; mz -= fz; }
+  if (keys['a']) { mx -= rx; mz -= rz; }
+  if (keys['d']) { mx += rx; mz += rz; }
+  x = x + mx * speed;
+  z = z + mz * speed;
+
+  // clamp
+  x = Math.max(-18, Math.min(18, x));
+  z = Math.max(-18, Math.min(18, z));
+
+  // shoot on click
+  if (mouse.down && time - userData.lastShot > 0.25) {
+    userData.lastShot = time;
+    let b = spawn('bullet', {
+      x: x + fx * 1.0,
+      y: 0.8,
+      z: z + fz * 1.0,
+      color: '#ffe066',
+      sx: 0.15, sy: 0.15, sz: 0.15
+    });
+    b.userData = { vx: fx * 20, vz: fz * 20, life: 2 };
+    b.script = 'function onUpdate(dt) { x = x + userData.vx * dt; z = z + userData.vz * dt; userData.life = userData.life - dt; if (userData.life < 0) destroy(); }';
+    b.lang = 'type';
+    Editor.scriptHost.compile(b);
+  }
+
+  // update HUD
+  Editor.hud = { score: userData.score, hp: userData.hp };
+}`;
+    player.lang='type';
+
+    // zombies
+    for(let i=0;i<8;i++){
+      const z=Editor.createObject('cube',{
+        x:U.rand(-12,12),y:0.5,z:U.rand(-12,12),name:'Zombie_'+i,
+        sx:0.8,sy:1.5,sz:0.8,color:'#c2334c',
+      });
+      z.userData={speed:U.rand(0.8,1.8),hp:30};
+      z.tags=['zombie'];
+      z.script=`function onUpdate(dt) {
+  let p = findByName('Player');
+  if (!p) return;
+  let dx = p.x - x, dz = p.z - z;
+  let d = Math.sqrt(dx*dx + dz*dz);
+  if (d < 0.9) {
+    // hit player
+    p.userData.hp = p.userData.hp - dt * 15;
+    return;
+  }
+  let sp = userData.speed * dt;
+  x = x + (dx/d) * sp;
+  z = z + (dz/d) * sp;
+  ry = Math.atan2(dx, dz);
+
+  // collision with bullets
+  let bullets = findByTag('bullet');
+  for (let i = 0; i < bullets.length; i++) {
+    let b = bullets[i];
+    let bd = distance(b);
+    if (bd < 0.9) {
+      userData.hp = userData.hp - 30;
+      b.userData.life = -1;
+      let p2 = findByName('Player');
+      if (p2) p2.userData.score = p2.userData.score + 10;
+      if (userData.hp <= 0) destroy();
+      return;
+    }
+  }
+}`;
+      z.lang='type';
+    }
+
+    Editor.refreshAll();
+    Logger.info('Шаблон Zombie Shooter загружен');
+    Editor.notify('Zombie Shooter загружен. F5 → играть','success');
+  },
+
+  empty(){
+    Editor.scene.objects=[];
+    Editor.selected=null;
+    Editor.refreshAll();
+    Logger.info('Пустая сцена');
+  },
+};
+
+/* ============================================================
+   EDITOR
+   ============================================================ */
+const Editor = {
+  scene:null,
+  renderer:null,
+  selected:null,
+  playMode:false,
+  inspectorTab:'transform',
+  keys:{},
+  mouse:{x:0,y:0,down:false,lookYaw:0},
+  camera:{yaw:0.6,pitch:0.3,dist:15,target:[0,1,0]},
+  playCamera:{yaw:0,pitch:-0.3,dist:6,target:[0,1,0]},
+  scriptHost:new ScriptHost(),
+  typeAssets:[],
+  hud:null,
+  fps:60,
+
+  init(){
+    this.scene=new Scene();
+    const canvas=document.getElementById('viewport');
+    this.renderer=new GLRenderer(canvas);
+    this.resize();
+    window.addEventListener('resize',()=>this.resize());
+
+    this.setupInput(canvas);
+    this.bindUI();
+    this.startLoop();
+    this.refreshAll();
+  },
+
+  resize(){
+    const wrap=document.getElementById('viewport-wrap');
+    this.renderer.resize(wrap.clientWidth,wrap.clientHeight);
+    this.draw();
+  },
+
+  setupInput(canvas){
+    canvas.addEventListener('contextmenu',e=>e.preventDefault());
+    canvas.addEventListener('mousedown',e=>{
+      if(this.playMode){
+        this.mouse.down=true;
+        canvas.requestPointerLock&&canvas.requestPointerLock();
+        return;
+      }
+      if(e.button===0){
+        const rect=canvas.getBoundingClientRect();
+        const cam=this.getEditorCamera();
+        const hit=this.renderer.pick(this.scene,e.clientX-rect.left,e.clientY-rect.top,cam);
+        if(hit)this.select(hit);
+        else this.select(null);
+      } else if(e.button===2){
+        // pan
+        this.dragPan=true;
+      }
+    });
+    window.addEventListener('mouseup',()=>{this.mouse.down=false;this.dragPan=false;});
+    canvas.addEventListener('mousemove',e=>{
+      if(this.playMode)return;
+      if(this.mouse.down||this.dragPan){
+        // orbit if no dragPan
+      }
+    });
+    let lastX=0,lastY=0;
+    canvas.addEventListener('mousedown',e=>{lastX=e.clientX;lastY=e.clientY;});
+    canvas.addEventListener('mousemove',e=>{
+      if(e.buttons===1&&!this.playMode){
+        const dx=e.clientX-lastX,dy=e.clientY-lastY;
+        lastX=e.clientX;lastY=e.clientY;
+        this.camera.yaw-=dx*0.01;
+        this.camera.pitch=Math.max(-1.5,Math.min(1.5,this.camera.pitch-dy*0.01));
+      } else if(e.buttons===2&&!this.playMode){
+        const dx=e.clientX-lastX,dy=e.clientY-lastY;
+        lastX=e.clientX;lastY=e.clientY;
+        const c=this.camera;
+        const right=[Math.cos(c.yaw),0,-Math.sin(c.yaw)];
+        const up=[-Math.sin(c.pitch)*Math.sin(c.yaw),Math.cos(c.pitch),-Math.sin(c.pitch)*Math.cos(c.yaw)];
+        const sc=c.dist*0.002;
+        c.target[0]-=(dx*right[0]+dy*-up[0])*sc;
+        c.target[1]-=(dx*right[1]+dy*-up[1])*sc;
+        c.target[2]-=(dx*right[2]+dy*-up[2])*sc;
+      }
+    });
+    canvas.addEventListener('wheel',e=>{
+      e.preventDefault();
+      if(!this.playMode)this.camera.dist=Math.max(1,Math.min(50,this.camera.dist*(1+e.deltaY*0.001)));
+    },{passive:false});
+
+    document.addEventListener('keydown',e=>{
+      this.keys[e.key.toLowerCase()]=true;
+      if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+      if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();this.deleteSelected();}
+      if(e.key==='F5'){e.preventDefault();this.setPlayMode(!this.playMode);}
+      if(e.key==='Escape'&&this.playMode){this.setPlayMode(false);}
+    });
+    document.addEventListener('keyup',e=>{
+      this.keys[e.key.toLowerCase()]=false;
+    });
+    document.addEventListener('mousemove',e=>{
+      if(this.playMode&&document.pointerLockElement){
+        this.mouse.lookYaw-=(e.movementX||0)*0.002;
+      }
+    });
+  },
+
+  getEditorCamera(){
+    const c=this.camera;
+    const cp=Math.cos(c.pitch);
+    const eye=[c.target[0]+c.dist*cp*Math.sin(c.yaw),c.target[1]+c.dist*Math.sin(c.pitch),c.target[2]+c.dist*cp*Math.cos(c.yaw)];
+    const aspect=this.renderer.canvas.width/this.renderer.canvas.height;
+    const proj=M4.perspective(Math.PI/4,aspect,0.05,200);
+    const view=M4.lookAt(eye,c.target,[0,1,0]);
+    return {eye,view,proj};
+  },
+
+  getPlayCamera(){
+    const player=this.scene.objects.find(o=>o.name==='Player');
+    if(!player)return this.getEditorCamera();
+    const yaw=this.mouse.lookYaw;
+    const eye=[player.transform.x,player.transform.y+1.5,player.transform.z];
+    const lookAt=[eye[0]-Math.sin(yaw)*5,eye[1]-0.5,eye[2]-Math.cos(yaw)*5];
+    const aspect=this.renderer.canvas.width/this.renderer.canvas.height;
+    const proj=M4.perspective(Math.PI/3,aspect,0.05,200);
+    const view=M4.lookAt(eye,lookAt,[0,1,0]);
+    return {eye,view,proj};
+  },
+
+  bindUI(){
+    document.querySelectorAll('.dropdown').forEach(dd=>{
+      const btn=dd.querySelector('.tb-btn');
+      btn.addEventListener('click',e=>{
+        e.stopPropagation();
+        document.querySelectorAll('.dropdown').forEach(d=>{if(d!==dd)d.classList.remove('open');});
+        dd.classList.toggle('open');
+      });
+    });
+    document.addEventListener('click',()=>document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open')));
+
+    document.querySelectorAll('.dropdown-item').forEach(item=>{
+      item.addEventListener('click',()=>{
+        const a=item.dataset.action;
+        const c=item.dataset.create;
+        const t=item.dataset.template;
+        if(a){
+          switch(a){
+            case 'new':this.scene=new Scene();this.selected=null;this.refreshAll();break;
+            case 'save':this.saveLocal();break;
+            case 'load':this.loadLocal();break;
+            case 'export-project':Exporter.exportProject();break;
+            case 'import-project':Exporter.importProject();break;
+            case 'export-html':Exporter.exportHTML();break;
+            case 'import-type':Importer.importTypeFile();break;
+          }
+        } else if(c){this.createObject(c);}
+        else if(t){
+          if(t==='zombie')Templates.zombieShooter();
+          else if(t==='empty')Templates.empty();
+        }
+      });
+    });
+
+    document.querySelectorAll('.insp-tab').forEach(tab=>{
+      tab.addEventListener('click',()=>{
+        document.querySelectorAll('.insp-tab').forEach(x=>x.classList.remove('active'));
+        tab.classList.add('active');
+        this.inspectorTab=tab.dataset.insp;
+        this.refreshInspector();
+      });
+    });
+
+    document.getElementById('btn-play').addEventListener('click',()=>this.setPlayMode(true));
+    document.getElementById('btn-stop').addEventListener('click',()=>this.setPlayMode(false));
+    document.getElementById('btn-modeler').addEventListener('click',()=>Modeler.open());
+    document.getElementById('btn-help').addEventListener('click',()=>Help.show());
+    document.getElementById('btn-credit').addEventListener('click',()=>{
+      this.notify('Unreal Typewriter — by unreal','success');
+      alert('Unreal Typewriter\n\nСоздатель: unreal\n3D Game Engine in a single HTML file.');
+    });
+    document.getElementById('cb-import').addEventListener('click',()=>Importer.importTypeFile());
+    document.getElementById('cb-new').addEventListener('click',()=>Modeler.open());
+    document.getElementById('outliner').addEventListener('click',e=>{
+      const item=e.target.closest('.tree-item');
+      if(!item)return;
+      const obj=this.scene.objects.find(o=>o.id===item.dataset.id);
+      if(!obj)return;
+      if(e.target.classList.contains('eye')){
+        obj.visible=!obj.visible;this.refreshOutliner();this.draw();return;
+      }
+      this.select(obj);
+    });
+    Logger.init();
+  },
+
+  select(obj){
+    this.selected=obj;
+    this.refreshOutliner();
+    this.refreshInspector();
+    document.getElementById('details-badge').textContent=obj?obj.name:'—';
+    document.getElementById('status-sel').textContent=obj?obj.name:'—';
+    this.draw();
+  },
+
+  createObject(type,opts={}){
+    const obj=new SceneObject(type,opts);
+    if(!opts.x&&!opts.y&&!opts.z){
+      obj.transform.x=U.rand(-3,3);
+      obj.transform.z=U.rand(-3,3);
+      obj.transform.y=type==='plane'?0:0.5;
+    }
+    if(type==='light'){obj.isLight=true;obj.material.color='#ffe4a0';obj.material.opacity=0.5;}
+    this.scene.add(obj);
+    this.refreshAll();
+    return obj;
+  },
+
+  deleteSelected(){
+    if(!this.selected)return;
+    this.deleteObject(this.selected);
+  },
+
+  deleteObject(obj){
+    this.scriptHost.destroy(obj.id);
+    this.scene.remove(obj);
+    if(this.selected===obj)this.selected=null;
+    this.refreshAll();
+  },
+
+  setPlayMode(on){
+    if(this.playMode===on)return;
+    this.playMode=on;
+    document.getElementById('btn-play').classList.toggle('active',on);
+    document.getElementById('status-state').textContent=on?'Playing':'Ready';
+    document.getElementById('viewport').classList.toggle('play-mode',on);
+    document.getElementById('center').classList.toggle('play-active',on);
+    if(on){
+      Logger.info('Play mode ON');
+      this.scriptHost.clear();
+      this.mouse.lookYaw=0;
+      this.hud=null;
+      this.scene.objects.forEach(o=>{
+        if(o.script)this.scriptHost.compile(o);
+        o.userData.vx=0;o.userData.vy=0;o.userData.vz=0;
+      });
+    } else {
+      Logger.info('Play mode OFF');
+      this.scriptHost.clear();
+      if(document.pointerLockElement)document.exitPointerLock();
+    }
+  },
+
+  refreshAll(){this.refreshOutliner();this.refreshContentBrowser();this.refreshInspector();this.updateStats();this.draw();},
+
+  refreshOutliner(){
+    const out=document.getElementById('outliner');
+    let html='';
+    this.scene.objects.forEach(o=>{
+      const sel=this.selected===o?' selected':'';
+      const eye=o.visible?'👁':'✕';
+      html+=`<div class="tree-item${sel}" data-id="${o.id}"><span class="eye">${eye}</span><span class="label">${U.esc(o.name)}</span><span class="type-badge">${o.type}</span></div>`;
+    });
+    out.innerHTML=html||'<div style="padding:20px;text-align:center;color:#4a4a5a;font-size:11px;">Пусто</div>';
+    document.getElementById('outliner-count').textContent=this.scene.objects.length;
+  },
+
+  refreshContentBrowser(){
+    const grid=document.getElementById('cb-grid');
+    let html='';
+    this.typeAssets.forEach(t=>{
+      html+=`<div class="cb-item" data-asset-id="${t.id}"><div class="thumb">${t.icon||'🧊'}</div><div class="name">${U.esc(t.name)}.type</div></div>`;
+    });
+    grid.innerHTML=html||'<div style="grid-column:1/-1;padding:14px;text-align:center;color:#4a4a5a;font-size:11px;">Пусто<br>+ создать или 📥 импорт</div>';
+    document.getElementById('cb-count').textContent=this.typeAssets.length;
+    grid.querySelectorAll('.cb-item').forEach(el=>{
+      el.addEventListener('dblclick',()=>{
+        const t=this.typeAssets.find(x=>x.id===el.dataset.assetId);
+        if(t)this.spawnTypeAsset(t);
+      });
+    });
+  },
+
+  spawnTypeAsset(asset){
+    if(!asset.meshes||!asset.meshes.length)return;
+    // Spawn each mesh in the asset as a scene object
+    asset.meshes.forEach((m,i)=>{
+      const obj=new SceneObject('cube',{
+        name:asset.name+'_'+(i+1),
+        x:U.rand(-3,3)+i*1.2,y:0.5,z:U.rand(-3,3),
+        rx:m.rotation[0],ry:m.rotation[1],rz:m.rotation[2],
+        sx:m.scale[0],sy:m.scale[1],sz:m.scale[2],
+        color:m.material.color,
+        opacity:m.material.opacity,
+        metallic:m.material.metallic,
+        roughness:m.material.roughness,
+      });
+      obj.type='mesh';
+      obj.geometry={
+        positions:new Float32Array(m.geometry.positions),
+        normals:new Float32Array(m.geometry.normals),
+        indices:new Uint16Array(m.geometry.indices),
+      };
+      obj.glBuffers=null;
+      this.scene.add(obj);
+    });
+    this.refreshAll();
+    this.notify('Спавн: '+asset.name,'success');
+  },
+
+  refreshInspector(){
+    const c=document.getElementById('inspector-content');
+    if(!this.selected){
+      c.innerHTML='<div class="insp-empty">Ничего не выбрано</div>';
+      return;
+    }
+    if(this.inspectorTab==='transform')this.renderTransform(c);
+    else if(this.inspectorTab==='render')this.renderRender(c);
+    else if(this.inspectorTab==='script')this.renderScript(c);
+  },
+
+  renderTransform(c){
+    const o=this.selected;
+    c.innerHTML=`
+      <div class="insp-section">
+        <div class="insp-section-title">Объект</div>
+        <div class="insp-row"><label>Имя</label><input class="insp-input" data-prop="name" value="${U.esc(o.name)}"></div>
+        <div class="insp-row"><label>Тип</label><input class="insp-input" value="${o.type}" readonly></div>
+      </div>
+      <div class="insp-section">
+        <div class="insp-section-title">Position</div>
+        <div class="insp-row"><label>X</label><input class="insp-input num" type="number" step="0.1" data-tf="x" value="${o.transform.x.toFixed(2)}"></div>
+        <div class="insp-row"><label>Y</label><input class="insp-input num" type="number" step="0.1" data-tf="y" value="${o.transform.y.toFixed(2)}"></div>
+        <div class="insp-row"><label>Z</label><input class="insp-input num" type="number" step="0.1" data-tf="z" value="${o.transform.z.toFixed(2)}"></div>
+      </div>
+      <div class="insp-section">
+        <div class="insp-section-title">Rotation (град)</div>
+        <div class="insp-row"><label>X</label><input class="insp-input num" type="number" step="5" data-tfr="rx" value="${(o.transform.rx*180/Math.PI).toFixed(0)}"></div>
+        <div class="insp-row"><label>Y</label><input class="insp-input num" type="number" step="5" data-tfr="ry" value="${(o.transform.ry*180/Math.PI).toFixed(0)}"></div>
+        <div class="insp-row"><label>Z</label><input class="insp-input num" type="number" step="5" data-tfr="rz" value="${(o.transform.rz*180/Math.PI).toFixed(0)}"></div>
+      </div>
+      <div class="insp-section">
+        <div class="insp-section-title">Scale</div>
+        <div class="insp-row"><label>X</label><input class="insp-input num" type="number" step="0.1" data-sf="sx" value="${o.transform.sx.toFixed(2)}"></div>
+        <div class="insp-row"><label>Y</label><input class="insp-input num" type="number" step="0.1" data-sf="sy" value="${o.transform.sy.toFixed(2)}"></div>
+        <div class="insp-row"><label>Z</label><input class="insp-input num" type="number" step="0.1" data-sf="sz" value="${o.transform.sz.toFixed(2)}"></div>
+      </div>
+    `;
+    c.querySelectorAll('[data-prop]').forEach(inp=>{
+      inp.addEventListener('input',()=>{
+        o[inp.dataset.prop]=inp.value;
+        this.refreshOutliner();
+      });
+    });
+    c.querySelectorAll('[data-tf]').forEach(inp=>{
+      inp.addEventListener('input',()=>{
+        o.transform[inp.dataset.tf]=parseFloat(inp.value)||0;
+      });
+    });
+    c.querySelectorAll('[data-tfr]').forEach(inp=>{
+      inp.addEventListener('input',()=>{
+        o.transform[inp.dataset.tfr]=(parseFloat(inp.value)||0)*Math.PI/180;
+      });
+    });
+    c.querySelectorAll('[data-sf]').forEach(inp=>{
+      inp.addEventListener('input',()=>{
+        o.transform[inp.dataset.sf]=parseFloat(inp.value)||1;
+      });
+    });
+  },
+
+  renderRender(c){
+    const o=this.selected;
+    const m=o.material;
+    c.innerHTML=`
+      <div class="insp-section">
+        <div class="insp-section-title">Материал</div>
+        <div class="insp-row"><label>Цвет</label><input class="insp-color" type="color" data-mat="color" value="${m.color}"></div>
+        <div class="insp-row"><label>Opacity</label><input class="insp-input num" type="number" min="0" max="1" step="0.1" data-mat="opacity" value="${m.opacity}"></div>
+        <div class="insp-row"><label>Металл</label><input class="insp-input num" type="number" min="0" max="1" step="0.05" data-mat="metallic" value="${m.metallic}"></div>
+        <div class="insp-row"><label>Шерох.</label><input class="insp-input num" type="number" min="0" max="1" step="0.05" data-mat="roughness" value="${m.roughness}"></div>
+      </div>
+      <div class="insp-section">
+        <div class="insp-section-title">Инфо</div>
+        <div class="insp-row"><label>Вершин</label><span style="font-family:monospace;font-size:11px">${(o.geometry.positions.length/3)|0}</span></div>
+        <div class="insp-row"><label>Треуг.</label><span style="font-family:monospace;font-size:11px">${(o.geometry.indices.length/3)|0}</span></div>
+      </div>
+    `;
+    c.querySelectorAll('[data-mat]').forEach(inp=>{
+      inp.addEventListener('input',()=>{
+        m[inp.dataset.mat]=inp.type==='color'?inp.value:parseFloat(inp.value);
+      });
+    });
+  },
+
+  renderScript(c){
+    const o=this.selected;
+    c.innerHTML=`
+      <div style="padding:4px">
+        <div style="display:flex;gap:4px;margin-bottom:6px">
+          <select class="script-lang-select" id="insp-lang" style="flex:1">
+            <option value="type" ${o.lang==='type'?'selected':''}>.type</option>
+            <option value="python" ${o.lang==='python'?'selected':''}>.py (Python)</option>
+            <option value="cpp" ${o.lang==='cpp'?'selected':''}>.cpp (C++)</option>
+          </select>
+          <button class="modal-btn" id="insp-open" style="padding:3px 10px">Открыть</button>
+        </div>
+        <textarea class="modal-textarea" id="insp-script" style="min-height:180px;font-size:11px">${U.esc(o.script)}</textarea>
+        <div style="display:flex;gap:4px;margin-top:4px">
+          <button class="modal-btn primary" id="insp-apply" style="flex:1;padding:4px">Применить</button>
+        </div>
+      </div>
+    `;
+    c.querySelector('#insp-lang').addEventListener('change',e=>{o.lang=e.target.value;});
+    c.querySelector('#insp-script').addEventListener('input',e=>{o.script=e.target.value;});
+    c.querySelector('#insp-apply').addEventListener('click',()=>{
+      o.script=c.querySelector('#insp-script').value;
+      this.scriptHost.destroy(o.id);
+      if(o.script)this.scriptHost.compile(o);
+      this.notify('Скрипт применён','success');
+    });
+    c.querySelector('#insp-open').addEventListener('click',()=>this.openScriptEditor(o));
+  },
+
+  openScriptEditor(obj){
+    const backdrop=document.getElementById('modal-backdrop');
+    const modal=document.getElementById('modal');
+    modal.classList.add('full');
+    document.getElementById('modal-title').textContent='Script Editor — '+obj.name;
+    const body=document.getElementById('modal-body');
+    body.classList.add('nopad');
+    body.innerHTML=`
+      <div style="display:flex;flex-direction:column;height:100%">
+        <div class="script-toolbar">
+          <select class="script-lang-select" id="se-lang">
+            <option value="type" ${obj.lang==='type'?'selected':''}>.type</option>
+            <option value="python" ${obj.lang==='python'?'selected':''}>.py</option>
+            <option value="cpp" ${obj.lang==='cpp'?'selected':''}>.cpp</option>
+          </select>
+          <div style="flex:1"></div>
+          <button class="modal-btn" id="se-compile">Компилировать</button>
+        </div>
+        <div class="script-editor-area">
+          <div class="line-numbers" id="se-lines"></div>
+          <textarea id="se-code" spellcheck="false">${U.esc(obj.script)}</textarea>
+        </div>
+        <div class="script-status">
+          <span id="se-status">готов</span>
+          <span id="se-info"></span>
+        </div>
+        <div style="display:flex;gap:4px;padding:6px 10px;border-top:1px solid #22222a">
+          <button class="modal-btn primary" id="se-apply" style="flex:1">Применить</button>
+          <button class="modal-btn" id="se-cancel">Закрыть</button>
+        </div>
+      </div>
+    `;
+    backdrop.classList.add('on');
+    const code=body.querySelector('#se-code');
+    const lines=body.querySelector('#se-lines');
+    const status=body.querySelector('#se-status');
+    const lang=body.querySelector('#se-lang');
+    const updateLines=()=>{
+      const n=code.value.split('\n').length;
+      let h='';for(let i=1;i<=n;i++)h+=i+'<br>';
+      lines.innerHTML=h;
+      body.querySelector('#se-info').textContent=n+' строк';
+    };
+    code.addEventListener('input',updateLines);
+    code.addEventListener('scroll',()=>{lines.scrollTop=code.scrollTop;});
+    updateLines();
+    lang.addEventListener('change',()=>{obj.lang=lang.value;});
+    body.querySelector('#se-compile').addEventListener('click',()=>{
+      obj.script=code.value;
+      this.scriptHost.destroy(obj.id);
+      const ok=this.scriptHost.compile(obj);
+      status.textContent=ok?'✓ скомпилирован':'✗ ошибка';
+      status.className=ok?'ok':'err';
+    });
+    body.querySelector('#se-apply').addEventListener('click',()=>{
+      obj.script=code.value;
+      this.scriptHost.destroy(obj.id);
+      if(obj.script)this.scriptHost.compile(obj);
+      this.closeModal();
+      this.notify('Сохранено','success');
+    });
+    body.querySelector('#se-cancel').addEventListener('click',()=>this.closeModal());
+  },
+
+  closeModal(){
+    document.getElementById('modal-backdrop').classList.remove('on');
+    document.getElementById('modal').classList.remove('full');
+    document.getElementById('modal-body').classList.remove('nopad');
+  },
+
+  saveLocal(){
+    const data={
+      scene:this.scene.toJSON(),
+      typeAssets:this.typeAssets,
+    };
+    localStorage.setItem('ut_project',JSON.stringify(data));
+    this.notify('Сохранено локально','success');
+  },
+
+  loadLocal(){
+    const raw=localStorage.getItem('ut_project');
+    if(!raw){this.notify('Нет сохранения','error');return;}
+    const data=JSON.parse(raw);
+    this.scene=Scene.fromJSON(data.scene);
+    this.typeAssets=data.typeAssets||[];
+    this.selected=null;
+    this.refreshAll();
+    this.notify('Загружено','success');
+  },
+
+  updateStats(){
+    document.getElementById('status-obj-count').textContent=this.scene.objects.length;
+    document.getElementById('vp-stats').textContent=`${this.scene.objects.length} objs · ${this.fps} fps`;
+  },
+
+  notify(text,type=''){
+    const n=document.createElement('div');
+    n.className='notif '+type;
+    n.textContent=text;
+    document.getElementById('notifications').appendChild(n);
+    setTimeout(()=>n.remove(),3000);
+  },
+
+  draw(){
+    if(this.playMode){
+      const cam=this.getPlayCamera();
+      this.renderer.render(this.scene,cam,this);
+    } else {
+      const cam=this.getEditorCamera();
+      this.renderer.render(this.scene,cam,this);
+    }
+    if(this.hud){
+      const hud=document.getElementById('vp-hud');
+      hud.innerHTML=`<div>HP: <span class="hp">${Math.max(0,Math.floor(this.hud.hp||0))}</span></div><div>Score: <span class="score">${this.hud.score||0}</span></div>`;
+    }
+  },
+
+  startLoop(){
+    let last=performance.now();
+    let fpsAcc=0,fpsFrames=0;
+    const loop=()=>{
+      const now=performance.now();
+      const dt=Math.min((now-last)/1000,0.05);
+      last=now;
+      fpsAcc+=dt*1000;fpsFrames++;
+      if(fpsAcc>500){
+        this.fps=Math.round(1000/(fpsAcc/fpsFrames));
+        document.getElementById('status-fps').textContent=this.fps+' fps';
+        this.updateStats();
+        fpsAcc=0;fpsFrames=0;
+      }
+      if(this.playMode){
+        this.scene.objects.slice().forEach(o=>{
+          this.scriptHost.update(o,dt);
+        });
+      }
+      this.draw();
+      requestAnimationFrame(loop);
+    };
+    loop();
+  },
+};
+
+/* ============================================================
+   HELP
+   ============================================================ */
+const Help = {
+  show(){
+    const backdrop=document.getElementById('modal-backdrop');
+    document.getElementById('modal-title').textContent='Помощь — Unreal Typewriter';
+    const body=document.getElementById('modal-body');
+    body.innerHTML=`
+      <div style="font-size:12px;line-height:1.7;color:#a8a8b8">
+        <p style="margin-bottom:12px;color:#e8e8f0;font-weight:600">Unreal Typewriter — by unreal</p>
+        <p style="margin-bottom:10px">3D-движок и редактор в одном HTML-файле. Создавай сцены, скрипты, игры.</p>
+        <p style="color:#e8e8f0;font-weight:600;margin-bottom:6px">Быстрый старт</p>
+        <ol style="margin-left:20px;margin-bottom:12px">
+          <li><b>Шаблоны → Zombie Shooter</b> — загрузит готовую мини-игру</li>
+          <li><b>F5 / Play</b> — запуск игры. WASD + мышь, клик — стрелять</li>
+          <li><b>Создать → Куб</b> — добавить объект в сцену</li>
+          <li><b>Инспектор → Script</b> — скрипт для объекта</li>
+          <li><b>Моделлер</b> — создать 3D-модель, сохранить как .type</li>
+        </ol>
+        <p style="color:#e8e8f0;font-weight:600;margin-bottom:6px">Скрипты (.type / .py / .cpp)</p>
+        <p style="margin-bottom:10px">API: <code>x, y, z, rx, ry, rz, sx, sy, sz, opacity, color, name, vx, vy, vz</code><br>
+        Методы: <code>spawn(type, props), destroy(), distance(obj), findByName(name)</code><br>
+        События: <code>onStart(), onUpdate(dt), onClick(), onCollision(other)</code></p>
+        <p style="color:#e8e8f0;font-weight:600;margin-bottom:6px">Импорт / Экспорт</p>
+        <p style="margin-bottom:12px">
+          <b>Файл → Экспорт проекта (.utproj)</b> — скачать всю сцену с ассетами<br>
+          <b>Файл → Импорт проекта</b> — загрузить .utproj<br>
+          <b>Файл → Импорт .type</b> — импортировать модель<br>
+          <b>Файл → Экспорт в HTML</b> — standalone игра в одном файле
+        </p>
+        <p style="color:#e8e8f0;font-weight:600;margin-bottom:6px">Управление в редакторе</p>
+        <p>ЛКМ — выбрать, drag — орбита; ПКМ — пан; колесо — зум<br>
+        F5 — Play, Esc — Stop, Del — удалить</p>
+      </div>
+    `;
+    document.getElementById('modal-footer').innerHTML='<button class="modal-btn primary" id="help-close">OK</button>';
+    backdrop.classList.add('on');
+    document.getElementById('help-close').onclick=()=>Editor.closeModal();
+  },
+};
+
+/* ============================================================
+   IMPORTER / EXPORTER
+   ============================================================ */
+const Importer = {
+  importTypeFile(){
+    const input=document.createElement('input');
+    input.type='file';
+    input.accept='.type,application/json';
+    input.onchange=e=>{
+      const f=e.target.files[0];
+      if(!f)return;
+      const r=new FileReader();
+      r.onload=()=>{
+        try{
+          const data=JSON.parse(r.result);
+          if(!data.name||!data.meshes)throw new Error('Не .type файл');
+          Editor.typeAssets.push(data);
+          Editor.refreshContentBrowser();
+          Editor.notify('.type импортирован: '+data.name,'success');
+        }catch(err){
+          Editor.notify('Ошибка: '+err.message,'error');
+        }
+      };
+      r.readAsText(f);
+    };
+    input.click();
+  },
+};
+
+const Exporter = {
+  exportProject(){
+    const data={
+      version:1,
+      name:'UnrealTypewriter Project',
+      scene:Editor.scene.toJSON(),
+      typeAssets:Editor.typeAssets,
+    };
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='project.utproj';a.click();
+    URL.revokeObjectURL(url);
+    Logger.info('Экспортирован project.utproj');
+    Editor.notify('Проект экспортирован','success');
+  },
+
+  importProject(){
+    const input=document.createElement('input');
+    input.type='file';
+    input.accept='.utproj,.json,application/json';
+    input.onchange=e=>{
+      const f=e.target.files[0];
+      if(!f)return;
+      const r=new FileReader();
+      r.onload=()=>{
+        try{
+          const data=JSON.parse(r.result);
+          if(!data.scene)throw new Error('Нет сцены в файле');
+          Editor.scene=Scene.fromJSON(data.scene);
+          Editor.typeAssets=data.typeAssets||[];
+          Editor.selected=null;
+          Editor.refreshAll();
+          Editor.notify('Проект импортирован: '+f.name,'success');
+          Logger.info('Импортирован '+f.name);
+        }catch(err){
+          Editor.notify('Ошибка импорта: '+err.message,'error');
+        }
+      };
+      r.readAsText(f);
+    };
+    input.click();
+  },
+
+  exportHTML(){
+    const data={
+      scene:Editor.scene.toJSON(),
+      typeAssets:Editor.typeAssets,
+    };
+    const html=this.buildStandalone(data);
+    const blob=new Blob([html],{type:'text/html'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='game.html';a.click();
+    URL.revokeObjectURL(url);
+    Logger.info('Экспортирован game.html');
+    Editor.notify('Standalone HTML экспортирован','success');
+  },
+
+  buildStandalone(data){
+    // Простой рантайм: WebGL + парсер-минимум + сцена
+    return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Unreal Typewriter Game</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;overflow:hidden;background:#000}canvas{display:block;width:100%;height:100%}#hud{position:fixed;top:12px;left:12px;color:#fff;font-family:monospace;font-size:14px;z-index:10}</style>
+</head><body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<script>
+const PROJECT=${JSON.stringify(data)};
+const U={uid:()=>Math.random().toString(36).slice(2,10),rand:(a,b)=>a+Math.random()*(b-a),dist:(x1,y1,z1,x2,y2,z2)=>Math.hypot(x2-x1,y2-y1,z2-z1)};
+const M4={
+  identity:()=>new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]),
+  multiply(a,b){const o=new Float32Array(16);for(let i=0;i<4;i++)for(let j=0;j<4;j++)o[j*4+i]=a[0*4+i]*b[j*4+0]+a[1*4+i]*b[j*4+1]+a[2*4+i]*b[j*4+2]+a[3*4+i]*b[j*4+3];return o},
+  perspective(f,a,n,fa){const t=1/Math.tan(f/2),nf=1/(n-fa);return new Float32Array([t/a,0,0,0,0,t,0,0,0,0,(fa+n)*nf,-1,0,0,2*fa*n*nf,0])},
+  lookAt(e,c,u){const zx=e[0]-c[0],zy=e[1]-c[1],zz=e[2]-c[2];let zl=Math.hypot(zx,zy,zz)||1;const Zx=zx/zl,Zy=zy/zl,Zz=zz/zl;const xx=u[1]*Zz-u[2]*Zy,xy=u[2]*Zx-u[0]*Zz,xz=u[0]*Zy-u[1]*Zx;let xl=Math.hypot(xx,xy,xz)||1;const Xx=xx/xl,Xy=xy/xl,Xz=xz/xl;const Yx=Zy*Xz-Zz*Xy,Yy=Zz*Xx-Zx*Xz,Yz=Zx*Xy-Zy*Xx;return new Float32Array([Xx,Yx,Zx,0,Xy,Yy,Zy,0,Xz,Yz,Zz,0,-(Xx*e[0]+Xy*e[1]+Xz*e[2]),-(Yx*e[0]+Yy*e[1]+Yz*e[2]),-(Zx*e[0]+Zy*e[1]+Zz*e[2]),1])},
+  compose(tx,ty,tz,rx,ry,rz,sx,sy,sz){let m=M4.identity();m[12]=tx;m[13]=ty;m[14]=tz;const cx=Math.cos(rx),sx2=Math.sin(rx);const rX=M4.identity();rX[5]=cx;rX[6]=sx2;rX[9]=-sx2;rX[10]=cx;m=M4.multiply(m,rX);const cy=Math.cos(ry),sy2=Math.sin(ry);const rY=M4.identity();rY[0]=cy;rY[2]=-sy2;rY[8]=sy2;rY[10]=cy;m=M4.multiply(m,rY);const cz=Math.cos(rz),sz2=Math.sin(rz);const rZ=M4.identity();rZ[0]=cz;rZ[1]=sz2;rZ[4]=-sz2;rZ[5]=cz;m=M4.multiply(m,rZ);const s=M4.identity();s[0]=sx;s[5]=sy;s[10]=sz;return M4.multiply(m,s)},
+};
+const V3={dot:(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],norm:a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/l,a[1]/l,a[2]/l]}};
+function mulMV(m,v){return[m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3],m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3],m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3],m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3]]}
+const canvas=document.getElementById('c');
+const gl=canvas.getContext('webgl',{antialias:true});
+function resize(){canvas.width=innerWidth*devicePixelRatio;canvas.height=innerHeight*devicePixelRatio;canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';gl.viewport(0,0,canvas.width,canvas.height)}
+resize();addEventListener('resize',resize);
+const vs='attribute vec3 aPos;attribute vec3 aNormal;uniform mat4 uModel,uView,uProj;varying vec3 vN;void main(){vN=mat3(uModel)*aNormal;gl_Position=uProj*uView*uModel*vec4(aPos,1.0)}';
+const fs='precision mediump float;varying vec3 vN;uniform vec3 uColor;uniform float uOpacity;void main(){vec3 n=normalize(vN);float d=max(dot(n,vec3(0.5,0.8,0.3)),0.0);gl_FragColor=vec4(uColor*(0.3+d*0.9),uOpacity)}';
+function sh(t,s){const x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);return x}
+const prog=gl.createProgram();gl.attachShader(prog,sh(gl.VERTEX_SHADER,vs));gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(prog);gl.useProgram(prog);
+const uModel=gl.getUniformLocation(prog,'uModel');const uView=gl.getUniformLocation(prog,'uView');const uProj=gl.getUniformLocation(prog,'uProj');const uColor=gl.getUniformLocation(prog,'uColor');const uOpacity=gl.getUniformLocation(prog,'uOpacity');
+const aPos=gl.getAttribLocation(prog,'aPos');const aNormal=gl.getAttribLocation(prog,'aNormal');
+gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.clearColor(0.1,0.1,0.16,1);
+const objects=[];
+function build(j){const o={...j,userData:j.userData||{},transform:j.transform,geometry:j.geometry,material:j.material,glBuffers:null,getMatrix(){const t=this.transform;return M4.compose(t.x,t.y,t.z,t.rx,t.ry,t.rz,t.sx,t.sy,t.sz)}};objects.push(o);return o}
+(PROJECT.scene.objects||[]).forEach(build);
+function upload(o){if(o.glBuffers)return;const pos=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,pos);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(o.geometry.positions),gl.STATIC_DRAW);const nrm=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,nrm);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(o.geometry.normals),gl.STATIC_DRAW);const idx=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,idx);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(o.geometry.indices),gl.STATIC_DRAW);o.glBuffers={pos,nrm,idx}}
+function hex(h){h=h.replace('#','');return[parseInt(h.substr(0,2),16)/255,parseInt(h.substr(2,2),16)/255,parseInt(h.substr(4,2),16)/255]}
+function render(){gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);const player=objects.find(o=>o.name==='Player');let eye,look;if(player){const yaw=window._yaw||0;eye=[player.transform.x,player.transform.y+1.5,player.transform.z];look=[eye[0]-Math.sin(yaw)*5,eye[1]-0.5,eye[2]-Math.cos(yaw)*5]}else{eye=[0,10,10];look=[0,0,0]}const aspect=canvas.width/canvas.height;gl.uniformMatrix4fv(uProj,false,M4.perspective(Math.PI/3,aspect,0.05,200));gl.uniformMatrix4fv(uView,false,M4.lookAt(eye,look,[0,1,0]));for(const o of objects){if(o.visible===false)continue;upload(o);const b=o.glBuffers;gl.uniformMatrix4fv(uModel,false,o.getMatrix());gl.bindBuffer(gl.ARRAY_BUFFER,b.pos);gl.enableVertexAttribArray(aPos);gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ARRAY_BUFFER,b.nrm);gl.enableVertexAttribArray(aNormal);gl.vertexAttribPointer(aNormal,3,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,b.idx);gl.uniform3fv(uColor,hex(o.material.color));gl.uniform1f(uOpacity,o.material.opacity);gl.drawElements(gl.TRIANGLES,o.geometry.indices.length,gl.UNSIGNED_SHORT,0)}}
+let _t=performance.now();
+function tick(){const now=performance.now();const dt=Math.min((now-_t)/1000,0.05);_t=now;const p=objects.find(o=>o.name==='Player');if(p&&p.transform){window._yaw=window._yaw||0;}render();requestAnimationFrame(tick)}
+tick();
+<\/script>
+</body></html>`;
+  },
+};
+
+/* ============================================================
+   SPLASH
+   ============================================================ */
+const Splash = {
+  steps:['инициализация ядра...','WebGL рендерер...','скриптовый движок...','готово'],
+  async run(){
+    const bar=document.getElementById('splash-bar');
+    const status=document.getElementById('splash-status');
+    for(let i=0;i<this.steps.length;i++){
+      status.textContent=this.steps[i];
+      bar.style.width=((i+1)/this.steps.length*100)+'%';
+      await new Promise(r=>setTimeout(r,200));
+    }
+    document.getElementById('splash').classList.add('fade');
+    setTimeout(()=>document.getElementById('splash').remove(),500);
+  },
+};
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+window.addEventListener('load',async()=>{
+  await Splash.run();
+  Logger.init();
+  Editor.init();
+
+  // demo scene - only if not first-run
+  Editor.createObject('plane',{x:0,y:0,z:0,name:'Ground',sx:20,sy:1,sz:20,color:'#2a2a3a'});
+  Editor.createObject('cube',{x:0,y:0.5,z:0,name:'Cube_1',color:'#5b8def'});
+  Editor.createObject('sphere',{x:2,y:0.5,z:0,name:'Sphere_1',color:'#e94560'});
+
+  document.getElementById('modal-close').addEventListener('click',()=>Editor.closeModal());
+  document.getElementById('modal-backdrop').addEventListener('click',e=>{
+    if(e.target.id==='modal-backdrop')Editor.closeModal();
+  });
+
+  Editor.refreshAll();
+  Editor.notify('Unreal Typewriter готов. by unreal','success');
+});
+</script>
+</body>
+</html>
