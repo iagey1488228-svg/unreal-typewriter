@@ -1,4 +1,4 @@
-# ⚡ Unreal Typewriter 3D Game Engine
+# ⚡ Unreal Typewriter Engine
 
 <p align="center">
   <img src="https://shields.io" alt="License">
